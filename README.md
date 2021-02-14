@@ -1,5 +1,7 @@
 # CameraAndLensDatabase
 
+![Test](https://github.com/sgryjp/CameraAndLensDatabase/workflows/Test/badge.svg?branch=main)
+
 Database of interchangeable-lens cameras and lenses.
 
 This repository provides two CSV files, [cameras.csv](cameras.csv) and
