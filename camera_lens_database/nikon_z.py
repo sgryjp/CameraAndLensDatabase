@@ -1,24 +1,14 @@
 import logging
 import re
-from typing import Iterator, Tuple
+from typing import Iterator, Optional, Tuple
 from urllib.parse import urljoin, urlparse
+from uuid import uuid4
 
 from bs4 import BeautifulSoup, Tag
 from bs4.element import ResultSet
 
-from . import (
-    IDX_BRAND,
-    IDX_MAX_F_VALUE,
-    IDX_MAX_FOCAL_LENGTH,
-    IDX_MIN_F_VALUE,
-    IDX_MIN_FOCAL_LENGTH,
-    IDX_MIN_FOCUS_DISTANCE,
-    IDX_MOUNT,
-    IDX_NAME,
-    config,
-)
+from . import config, lenses
 from .exceptions import CameraLensDatabaseException
-from .spec import LensSpec
 from .utils import fetch
 
 _logger = logging.getLogger(__name__)
@@ -61,8 +51,7 @@ def enumerate_nikon_z_lens() -> Iterator[Tuple[str, str]]:
         yield name, abs_dest
 
 
-def read_nikon_z_lens(name: str, uri: str):
-    # https://www.nikon-image.com/products/nikkor/zmount/NAME/spec.html
+def read_nikon_z_lens(name: str, uri: str) -> Optional[lenses.Lens]:
     try:
         html_text = fetch(uri)
         soup = BeautifulSoup(html_text, config["bs_features"])
@@ -71,9 +60,13 @@ def read_nikon_z_lens(name: str, uri: str):
             msg = f"spec table not found: {uri}"
             raise CameraLensDatabaseException(msg)
 
-        # Collect interested th-td pairs from the spec table
+        # Collect and parse interested th-td pairs from the spec table
         spec_table: Tag = selection[0]
-        pairs = [(IDX_NAME, name), (IDX_BRAND, "Nikon")]
+        pairs = [
+            (lenses.IDX_NAME, name),
+            (lenses.IDX_BRAND, "Nikon"),
+            (lenses.IDX_COMMENT, ""),
+        ]
         for row in spec_table.select("tr"):
             ths: ResultSet = row.select("th")
             tds: ResultSet = row.select("td")
@@ -87,15 +80,17 @@ def read_nikon_z_lens(name: str, uri: str):
                 pairs.append((index, value))
         values = dict(pairs)
 
-        return LensSpec(
-            name=values[IDX_NAME],
-            brand=values[IDX_BRAND],
-            mount=values[IDX_MOUNT],
-            min_focal_length=values[IDX_MIN_FOCAL_LENGTH],
-            max_focal_length=values[IDX_MAX_FOCAL_LENGTH],
-            min_f_value=values[IDX_MIN_F_VALUE],
-            max_f_value=values[IDX_MAX_F_VALUE],
-            min_focus_distance=values[IDX_MIN_FOCUS_DISTANCE],
+        # Compose a spec object from the table content
+        return lenses.Lens(
+            id=uuid4(),
+            name=values[lenses.IDX_NAME],
+            brand=values[lenses.IDX_BRAND],
+            mount=values[lenses.IDX_MOUNT],
+            min_focal_length=values[lenses.IDX_MIN_FOCAL_LENGTH],
+            max_focal_length=values[lenses.IDX_MAX_FOCAL_LENGTH],
+            min_f_value=values[lenses.IDX_MIN_F_VALUE],
+            max_f_value=values[lenses.IDX_MAX_F_VALUE],
+            min_focus_distance=values[lenses.IDX_MIN_FOCUS_DISTANCE],
         )
     except Exception as ex:
         msg = f"failed to read spec of '{name}' from {uri}: {str(ex)}"
@@ -104,30 +99,30 @@ def read_nikon_z_lens(name: str, uri: str):
 
 def recognize_nikon_z_term(key: str, value: str):
     if key == "型式":
-        yield IDX_MOUNT, _mount_names[value]
+        yield lenses.IDX_MOUNT, _mount_names[value]
     elif key == "焦点距離":
         match = re.match(r"([\d\.]+)mm\s*-\s*([\d\.]+)mm", value)
         if not match:
             msg = f"pattern unmatched: {value!r}"
             raise CameraLensDatabaseException(msg)
-        yield IDX_MIN_FOCAL_LENGTH, match.group(1)
-        yield IDX_MAX_FOCAL_LENGTH, match.group(2)
+        yield lenses.IDX_MIN_FOCAL_LENGTH, match.group(1)
+        yield lenses.IDX_MAX_FOCAL_LENGTH, match.group(2)
     elif key == "最短撮影距離":
         # 0.5 m（焦点距離50 mm）、0.52 m（焦点距離70 mm）、...
         distances = []
         for number, unit in re.findall(r"([\d\.]+)\s*(m)", value):
             ratio = {"m": 1000, "mm": 1}[unit]
             distances.append(float(number) * ratio)
-        yield IDX_MIN_FOCUS_DISTANCE, min(distances)
+        yield lenses.IDX_MIN_FOCUS_DISTANCE, min(distances)
     elif key == "最小絞り":
         match = re.match(r"f/([\d\.]+)", value)
         if not match:
             msg = f"pattern unmatched: {value!r}"
             raise CameraLensDatabaseException(msg)
-        yield IDX_MIN_F_VALUE, match.group(1)
+        yield lenses.IDX_MIN_F_VALUE, match.group(1)
     elif key == "最大絞り":
         match = re.match(r"f/([\d\.]+)", value)
         if not match:
             msg = f"pattern unmatched: {value!r}"
             raise CameraLensDatabaseException(msg)
-        yield IDX_MAX_F_VALUE, match.group(1)
+        yield lenses.IDX_MAX_F_VALUE, match.group(1)
