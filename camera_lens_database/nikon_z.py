@@ -97,9 +97,9 @@ def read_nikon_z_lens(name: str, uri: str):
             max_f_value=values[IDX_MAX_F_VALUE],
             min_focus_distance=values[IDX_MIN_FOCUS_DISTANCE],
         )
-    except Exception:
-        _logger.exception("failed to read spec of '%s' from %s", name, uri)
-        raise
+    except Exception as ex:
+        msg = f"failed to read spec of '{name}' from {uri}: {str(ex)}"
+        raise CameraLensDatabaseException(msg)
 
 
 def recognize_nikon_z_term(key: str, value: str):
