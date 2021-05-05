@@ -1,0 +1,2 @@
+class CameraLensDatabaseException(Exception):
+    pass

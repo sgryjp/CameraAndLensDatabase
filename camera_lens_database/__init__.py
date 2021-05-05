@@ -1,5 +1,3 @@
-import dataclasses
-
 __version__ = "21.5.4"
 # KEY_NAME = "Name"
 # KEY_BRAND = "Brand"
@@ -20,19 +18,3 @@ IDX_MIN_FOCUS_DISTANCE = 7
 config = {
     "bs_features": "lxml",
 }
-
-
-class ScraperException(Exception):
-    pass
-
-
-@dataclasses.dataclass
-class LensSpec(object):
-    name: str
-    brand: str
-    mount: str
-    min_focal_length: float
-    max_focal_length: float
-    min_f_value: float
-    max_f_value: float
-    min_focus_distance: float

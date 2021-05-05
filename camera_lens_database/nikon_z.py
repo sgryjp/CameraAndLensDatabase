@@ -16,10 +16,10 @@ from . import (
     IDX_MIN_FOCUS_DISTANCE,
     IDX_MOUNT,
     IDX_NAME,
-    LensSpec,
-    ScraperException,
     config,
 )
+from .exceptions import CameraLensDatabaseException
+from .spec import LensSpec
 
 _logger = logging.getLogger(__name__)
 _mount_names = {
@@ -69,7 +69,7 @@ def read_nikon_z_lens(name: str, uri: str):
         selection = soup.select("div#spec ~ table")
         if len(selection) <= 0:
             msg = f"spec table not found: {uri}"
-            raise ScraperException(msg)
+            raise CameraLensDatabaseException(msg)
 
         # Collect interested th-td pairs from the spec table
         spec_table: Tag = selection[0]
@@ -79,7 +79,7 @@ def read_nikon_z_lens(name: str, uri: str):
             tds: ResultSet = row.select("td")
             if len(ths) != 1 or len(tds) != 1:
                 msg = f"spec table does not have 1 by 1 th-td pairs: {uri}"
-                raise ScraperException(msg)
+                raise CameraLensDatabaseException(msg)
 
             for index, value in recognize_nikon_z_term(
                 key=ths[0].text, value=tds[0].text
@@ -109,7 +109,7 @@ def recognize_nikon_z_term(key: str, value: str):
         match = re.match(r"([\d\.]+)mm\s*-\s*([\d\.]+)mm", value)
         if not match:
             msg = f"pattern unmatched: {value!r}"
-            raise ScraperException(msg)
+            raise CameraLensDatabaseException(msg)
         yield IDX_MIN_FOCAL_LENGTH, match.group(1)
         yield IDX_MAX_FOCAL_LENGTH, match.group(2)
     elif key == "最短撮影距離":
@@ -123,11 +123,11 @@ def recognize_nikon_z_term(key: str, value: str):
         match = re.match(r"f/([\d\.]+)", value)
         if not match:
             msg = f"pattern unmatched: {value!r}"
-            raise ScraperException(msg)
+            raise CameraLensDatabaseException(msg)
         yield IDX_MIN_F_VALUE, match.group(1)
     elif key == "最大絞り":
         match = re.match(r"f/([\d\.]+)", value)
         if not match:
             msg = f"pattern unmatched: {value!r}"
-            raise ScraperException(msg)
+            raise CameraLensDatabaseException(msg)
         yield IDX_MAX_F_VALUE, match.group(1)
