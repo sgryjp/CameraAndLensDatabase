@@ -3,7 +3,6 @@ import re
 from typing import Iterator, Tuple
 from urllib.parse import urljoin, urlparse
 
-import requests
 from bs4 import BeautifulSoup, Tag
 from bs4.element import ResultSet
 
@@ -20,6 +19,7 @@ from . import (
 )
 from .exceptions import CameraLensDatabaseException
 from .spec import LensSpec
+from .utils import fetch
 
 _logger = logging.getLogger(__name__)
 _mount_names = {
@@ -32,8 +32,8 @@ def enumerate_nikon_z_lens() -> Iterator[Tuple[str, str]]:
     # From: "https://www.nikon-image.com/products/nikkor/zmount/index.html"
     # To:   "https://www.nikon-image.com/products/nikkor/zmount/NAME/spec.html"
     base_uri = "https://www.nikon-image.com/products/nikkor/zmount/index.html"
-    resp = requests.get(base_uri)
-    soup = BeautifulSoup(resp.text, features=config["bs_features"])
+    html_text = fetch(base_uri)
+    soup = BeautifulSoup(html_text, features=config["bs_features"])
     for anchor in soup.select(".mod-goodsList-ul > li > a"):
         # Get the equipment name
         name = anchor.select(".mod-goodsList-title")[0].text
@@ -64,8 +64,8 @@ def enumerate_nikon_z_lens() -> Iterator[Tuple[str, str]]:
 def read_nikon_z_lens(name: str, uri: str):
     # https://www.nikon-image.com/products/nikkor/zmount/NAME/spec.html
     try:
-        resp = requests.get(uri)
-        soup = BeautifulSoup(resp.text, config["bs_features"])
+        html_text = fetch(uri)
+        soup = BeautifulSoup(html_text, config["bs_features"])
         selection = soup.select("div#spec ~ table")
         if len(selection) <= 0:
             msg = f"spec table not found: {uri}"
