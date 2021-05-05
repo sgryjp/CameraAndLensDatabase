@@ -2,7 +2,7 @@ import pathlib
 
 import typer
 
-__version__ = "21.5.4"
+__version__ = "21.5.5"
 
 APP_NAME = "Camera Lens Database"
 
