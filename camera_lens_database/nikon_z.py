@@ -19,7 +19,7 @@ _mount_names = {
 }
 
 
-def enumerate_nikon_z_lens() -> Iterator[Tuple[str, str]]:
+def enumerate_lenses() -> Iterator[Tuple[str, str]]:
     base_uri = "https://www.nikon-image.com/products/nikkor/zmount/index.html"
     html_text = fetch(base_uri)
     soup = BeautifulSoup(html_text, features=config["bs_features"])
@@ -50,7 +50,7 @@ def enumerate_nikon_z_lens() -> Iterator[Tuple[str, str]]:
         yield name, abs_dest
 
 
-def read_nikon_z_lens(name: str, uri: str) -> Optional[lenses.Lens]:
+def read_lens(name: str, uri: str) -> Optional[lenses.Lens]:
     try:
         html_text = fetch(uri)
         soup = BeautifulSoup(html_text, config["bs_features"])
@@ -73,7 +73,7 @@ def read_nikon_z_lens(name: str, uri: str) -> Optional[lenses.Lens]:
                 msg = f"spec table does not have 1 by 1 th-td pairs: {uri}"
                 raise CameraLensDatabaseException(msg)
 
-            for index, value in recognize_nikon_z_term(
+            for index, value in recognize_lens_term(
                 key=ths[0].text, value=tds[0].text
             ):
                 pairs.append((index, value))
@@ -98,7 +98,7 @@ def read_nikon_z_lens(name: str, uri: str) -> Optional[lenses.Lens]:
         raise CameraLensDatabaseException(msg)
 
 
-def recognize_nikon_z_term(key: str, value: str):
+def recognize_lens_term(key: str, value: str):
     if "主レンズ" in value:
         return  # Tele-converter
 
