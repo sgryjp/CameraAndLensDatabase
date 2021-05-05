@@ -15,6 +15,8 @@ def fetch():
     try:
         for name, uri in enumerate_nikon_z_lens():
             spec = read_nikon_z_lens(name, uri)
+            if spec is None:
+                continue
             print("#", spec)
     except Exception:
         _logger.exception("")

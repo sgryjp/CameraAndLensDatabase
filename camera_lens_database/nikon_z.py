@@ -1,3 +1,4 @@
+import dataclasses
 import logging
 import re
 from typing import Iterator, Optional, Tuple
@@ -19,8 +20,6 @@ _mount_names = {
 
 
 def enumerate_nikon_z_lens() -> Iterator[Tuple[str, str]]:
-    # From: "https://www.nikon-image.com/products/nikkor/zmount/index.html"
-    # To:   "https://www.nikon-image.com/products/nikkor/zmount/NAME/spec.html"
     base_uri = "https://www.nikon-image.com/products/nikkor/zmount/index.html"
     html_text = fetch(base_uri)
     soup = BeautifulSoup(html_text, features=config["bs_features"])
@@ -79,6 +78,8 @@ def read_nikon_z_lens(name: str, uri: str) -> Optional[lenses.Lens]:
             ):
                 pairs.append((index, value))
         values = dict(pairs)
+        if len(values) != len(dataclasses.fields(lenses.Lens)):
+            return None
 
         # Compose a spec object from the table content
         return lenses.Lens(
@@ -98,15 +99,26 @@ def read_nikon_z_lens(name: str, uri: str) -> Optional[lenses.Lens]:
 
 
 def recognize_nikon_z_term(key: str, value: str):
+    if "主レンズ" in value:
+        return  # Tele-converter
+
     if key == "型式":
         yield lenses.IDX_MOUNT, _mount_names[value]
     elif key == "焦点距離":
         match = re.match(r"([\d\.]+)mm\s*-\s*([\d\.]+)mm", value)
-        if not match:
-            msg = f"pattern unmatched: {value!r}"
-            raise CameraLensDatabaseException(msg)
-        yield lenses.IDX_MIN_FOCAL_LENGTH, match.group(1)
-        yield lenses.IDX_MAX_FOCAL_LENGTH, match.group(2)
+        if match:
+            yield lenses.IDX_MIN_FOCAL_LENGTH, match.group(1)
+            yield lenses.IDX_MAX_FOCAL_LENGTH, match.group(2)
+            return
+
+        match = re.match(r"([\d\.]+)mm", value)
+        if match:
+            yield lenses.IDX_MIN_FOCAL_LENGTH, match.group(1)
+            yield lenses.IDX_MAX_FOCAL_LENGTH, match.group(1)
+            return
+
+        msg = f"pattern unmatched: {value!r}"
+        raise CameraLensDatabaseException(msg)
     elif key == "最短撮影距離":
         # 0.5 m（焦点距離50 mm）、0.52 m（焦点距離70 mm）、...
         distances = []
