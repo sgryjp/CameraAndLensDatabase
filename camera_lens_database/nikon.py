@@ -101,11 +101,11 @@ def recognize_lens_term(key: str, value: str):
         distances = list(enum_millimeter_values(value))
         yield lenses.KEY_MIN_FOCUS_DISTANCE, min(distances)
     elif key == "最小絞り":
-        for f_value in enum_f_numbers(value):
-            yield lenses.KEY_MIN_F_VALUE, float(f_value)
+        f_values = list(enum_f_numbers(value))
+        yield lenses.KEY_MAX_F_VALUE, max(f_values)
     elif key == "最大絞り":
-        for f_value in enum_f_numbers(value):
-            yield lenses.KEY_MAX_F_VALUE, float(f_value)
+        f_values = list(enum_f_numbers(value))
+        yield lenses.KEY_MIN_F_VALUE, min(f_values)
 
 
 def _parse_mount_name(s: str):
