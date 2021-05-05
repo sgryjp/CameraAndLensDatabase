@@ -1,5 +1,7 @@
+import re
 from datetime import datetime, timedelta
 from hashlib import sha256
+from typing import Iterator, Tuple
 
 import requests
 
@@ -23,3 +25,32 @@ def fetch(uri: str) -> str:
     resp = requests.get(uri)
     cache_file_path.write_text(resp.text, encoding="utf-8", errors="replace")
     return resp.text
+
+
+def enum_millimeter_ranges(s: str) -> Iterator[Tuple[float, float]]:
+    pairs = [
+        (float(n1), float(n2))
+        for n1, n2 in re.findall(r"([\d\.]+)(?:mm)?\s*-\s*([\d\.]+)mm", s)
+    ]
+    singles = [float(n) for n in re.findall(r"([\d\.]+)mm", s)]
+    for n1, n2 in pairs:
+        yield n1, n2
+    for n in singles:
+        yield n, n
+
+
+def enum_millimeter_values(s: str) -> Iterator[float]:
+    for number, unit in re.findall(r"([\d\.]+)\s*(m)", s):
+        if unit == "mm":
+            ratio = 1.0
+        elif unit == "m":
+            ratio = 1000.0
+        else:
+            continue
+
+        yield float(number) * ratio
+
+
+def enum_f_numbers(s: str) -> Iterator[float]:
+    for number in re.findall(r"f/([\d\.]+)", s):
+        yield float(number)

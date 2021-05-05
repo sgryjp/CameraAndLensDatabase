@@ -1,6 +1,5 @@
 import logging
-import re
-from typing import Dict, Iterator, List, Optional, Tuple, Union
+from typing import Dict, Iterator, Optional, Tuple, Union
 from urllib.parse import urljoin, urlparse
 from uuid import uuid4
 
@@ -9,17 +8,16 @@ from bs4.element import ResultSet
 
 from . import config, lenses
 from .exceptions import CameraLensDatabaseException
-from .utils import fetch
+from .utils import enum_f_numbers, enum_millimeter_ranges, enum_millimeter_values, fetch
 
 _logger = logging.getLogger(__name__)
-_mount_names = {
-    "ニコン Z マウント": "Nikon Z",
-    "ニコン Zマウント": "Nikon Z",
-}
 
 
-def enumerate_lenses() -> Iterator[Tuple[str, str]]:
-    base_uri = "https://www.nikon-image.com/products/nikkor/zmount/index.html"
+def enumerate_lenses(zmount: bool = True) -> Iterator[Tuple[str, str]]:
+    if zmount:
+        base_uri = "https://www.nikon-image.com/products/nikkor/zmount/index.html"
+    else:
+        base_uri = "https://www.nikon-image.com/products/nikkor/fmount/index.html"
     html_text = fetch(base_uri)
     soup = BeautifulSoup(html_text, features=config["bs_features"])
     for anchor in soup.select(".mod-goodsList-ul > li > a"):
@@ -90,38 +88,32 @@ def recognize_lens_term(key: str, value: str):
         return  # Tele-converter
 
     if key == "型式":
-        yield lenses.KEY_MOUNT, _mount_names[value]
+        yield lenses.KEY_MOUNT, _parse_mount_name(value)
     elif key == "焦点距離":
-        match = re.match(r"([\d\.]+)mm\s*-\s*([\d\.]+)mm", value)
-        if match:
-            yield lenses.KEY_MIN_FOCAL_LENGTH, float(match.group(1))
-            yield lenses.KEY_MAX_FOCAL_LENGTH, float(match.group(2))
-            return
-
-        match = re.match(r"([\d\.]+)mm", value)
-        if match:
-            yield lenses.KEY_MIN_FOCAL_LENGTH, float(match.group(1))
-            yield lenses.KEY_MAX_FOCAL_LENGTH, float(match.group(1))
+        for min_dist, max_dist in enum_millimeter_ranges(value):
+            yield lenses.KEY_MIN_FOCAL_LENGTH, float(min_dist)
+            yield lenses.KEY_MAX_FOCAL_LENGTH, float(max_dist)
             return
 
         msg = f"pattern unmatched: {value!r}"
         raise CameraLensDatabaseException(msg)
     elif key == "最短撮影距離":
-        # 0.5 m（焦点距離50 mm）、0.52 m（焦点距離70 mm）、...
-        distances: List[float] = []
-        for number, unit in re.findall(r"([\d\.]+)\s*(m)", value):
-            ratio = {"m": 1000, "mm": 1}[unit]
-            distances.append(float(number) * ratio)
+        distances = list(enum_millimeter_values(value))
         yield lenses.KEY_MIN_FOCUS_DISTANCE, min(distances)
     elif key == "最小絞り":
-        match = re.match(r"f/([\d\.]+)", value)
-        if not match:
-            msg = f"pattern unmatched: {value!r}"
-            raise CameraLensDatabaseException(msg)
-        yield lenses.KEY_MIN_F_VALUE, float(match.group(1))
+        for f_value in enum_f_numbers(value):
+            yield lenses.KEY_MIN_F_VALUE, float(f_value)
     elif key == "最大絞り":
-        match = re.match(r"f/([\d\.]+)", value)
-        if not match:
-            msg = f"pattern unmatched: {value!r}"
-            raise CameraLensDatabaseException(msg)
-        yield lenses.KEY_MAX_F_VALUE, float(match.group(1))
+        for f_value in enum_f_numbers(value):
+            yield lenses.KEY_MAX_F_VALUE, float(f_value)
+
+
+def _parse_mount_name(s: str):
+    s = s.replace(" ", "")
+    if "ニコンZマウント" in s:
+        return "Nikon Z"
+    elif "ニコンFマウント" in s:
+        return "Nikon F"
+    else:
+        msg = f"unkown mount description: '{s}'"
+        raise CameraLensDatabaseException(msg)
