@@ -22,7 +22,8 @@ def enumerate_lenses(zmount: bool = True) -> Iterator[Tuple[str, str]]:
     soup = BeautifulSoup(html_text, features=config["bs_features"])
     for anchor in soup.select(".mod-goodsList-ul > li > a"):
         # Get the equipment name
-        name = anchor.select(".mod-goodsList-title")[0].text
+        name: str = anchor.select(".mod-goodsList-title")[0].text
+        name = name.rstrip(" 旧製品")
 
         # Get raw value of href attribute
         raw_dest = anchor["href"]
