@@ -32,9 +32,11 @@ def enum_millimeter_ranges(s: str) -> Iterator[Tuple[float, float]]:
         (float(n1), float(n2))
         for n1, n2 in re.findall(r"([\d\.]+)(?:mm)?\s*-\s*([\d\.]+)mm", s)
     ]
-    singles = [float(n) for n in re.findall(r"([\d\.]+)mm", s)]
     for n1, n2 in pairs:
         yield n1, n2
+        return  # do not try extracting single value if a range found
+
+    singles = [float(n) for n in re.findall(r"([\d\.]+)mm", s)]
     for n in singles:
         yield n, n
 
