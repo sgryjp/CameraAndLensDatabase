@@ -1,7 +1,6 @@
-import dataclasses
 import logging
 import re
-from typing import Iterator, Optional, Tuple
+from typing import Dict, Iterator, List, Optional, Tuple, Union
 from urllib.parse import urljoin, urlparse
 from uuid import uuid4
 
@@ -61,11 +60,12 @@ def read_lens(name: str, uri: str) -> Optional[lenses.Lens]:
 
         # Collect and parse interested th-td pairs from the spec table
         spec_table: Tag = selection[0]
-        pairs = [
-            (lenses.IDX_NAME, name),
-            (lenses.IDX_BRAND, "Nikon"),
-            (lenses.IDX_COMMENT, ""),
-        ]
+        pairs: Dict[str, Union[float, str]] = {
+            lenses.KEY_ID: str(uuid4()),
+            lenses.KEY_NAME: name,
+            lenses.KEY_BRAND: "Nikon",
+            lenses.KEY_COMMENT: "",
+        }
         for row in spec_table.select("tr"):
             ths: ResultSet = row.select("th")
             tds: ResultSet = row.select("td")
@@ -73,26 +73,13 @@ def read_lens(name: str, uri: str) -> Optional[lenses.Lens]:
                 msg = f"spec table does not have 1 by 1 th-td pairs: {uri}"
                 raise CameraLensDatabaseException(msg)
 
-            for index, value in recognize_lens_term(
-                key=ths[0].text, value=tds[0].text
-            ):
-                pairs.append((index, value))
-        values = dict(pairs)
-        if len(values) != len(dataclasses.fields(lenses.Lens)):
+            for key, value in recognize_lens_term(key=ths[0].text, value=tds[0].text):
+                pairs[key] = value
+        if len(pairs) != len(lenses.Lens.__fields__):
             return None
 
         # Compose a spec object from the table content
-        return lenses.Lens(
-            id=uuid4(),
-            name=values[lenses.IDX_NAME],
-            brand=values[lenses.IDX_BRAND],
-            mount=values[lenses.IDX_MOUNT],
-            min_focal_length=values[lenses.IDX_MIN_FOCAL_LENGTH],
-            max_focal_length=values[lenses.IDX_MAX_FOCAL_LENGTH],
-            min_f_value=values[lenses.IDX_MIN_F_VALUE],
-            max_f_value=values[lenses.IDX_MAX_F_VALUE],
-            min_focus_distance=values[lenses.IDX_MIN_FOCUS_DISTANCE],
-        )
+        return lenses.Lens(**pairs)
     except Exception as ex:
         msg = f"failed to read spec of '{name}' from {uri}: {str(ex)}"
         raise CameraLensDatabaseException(msg)
@@ -103,38 +90,38 @@ def recognize_lens_term(key: str, value: str):
         return  # Tele-converter
 
     if key == "型式":
-        yield lenses.IDX_MOUNT, _mount_names[value]
+        yield lenses.KEY_MOUNT, _mount_names[value]
     elif key == "焦点距離":
         match = re.match(r"([\d\.]+)mm\s*-\s*([\d\.]+)mm", value)
         if match:
-            yield lenses.IDX_MIN_FOCAL_LENGTH, match.group(1)
-            yield lenses.IDX_MAX_FOCAL_LENGTH, match.group(2)
+            yield lenses.KEY_MIN_FOCAL_LENGTH, float(match.group(1))
+            yield lenses.KEY_MAX_FOCAL_LENGTH, float(match.group(2))
             return
 
         match = re.match(r"([\d\.]+)mm", value)
         if match:
-            yield lenses.IDX_MIN_FOCAL_LENGTH, match.group(1)
-            yield lenses.IDX_MAX_FOCAL_LENGTH, match.group(1)
+            yield lenses.KEY_MIN_FOCAL_LENGTH, float(match.group(1))
+            yield lenses.KEY_MAX_FOCAL_LENGTH, float(match.group(1))
             return
 
         msg = f"pattern unmatched: {value!r}"
         raise CameraLensDatabaseException(msg)
     elif key == "最短撮影距離":
         # 0.5 m（焦点距離50 mm）、0.52 m（焦点距離70 mm）、...
-        distances = []
+        distances: List[float] = []
         for number, unit in re.findall(r"([\d\.]+)\s*(m)", value):
             ratio = {"m": 1000, "mm": 1}[unit]
             distances.append(float(number) * ratio)
-        yield lenses.IDX_MIN_FOCUS_DISTANCE, min(distances)
+        yield lenses.KEY_MIN_FOCUS_DISTANCE, min(distances)
     elif key == "最小絞り":
         match = re.match(r"f/([\d\.]+)", value)
         if not match:
             msg = f"pattern unmatched: {value!r}"
             raise CameraLensDatabaseException(msg)
-        yield lenses.IDX_MIN_F_VALUE, match.group(1)
+        yield lenses.KEY_MIN_F_VALUE, float(match.group(1))
     elif key == "最大絞り":
         match = re.match(r"f/([\d\.]+)", value)
         if not match:
             msg = f"pattern unmatched: {value!r}"
             raise CameraLensDatabaseException(msg)
-        yield lenses.IDX_MAX_F_VALUE, match.group(1)
+        yield lenses.KEY_MAX_F_VALUE, float(match.group(1))
