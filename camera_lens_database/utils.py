@@ -7,6 +7,8 @@ import requests
 
 from . import cache_root
 
+CACHE_TIMEOUT = 8 * 3600
+
 
 def fetch(uri: str) -> str:
     # Ensure the cache dir exists
@@ -18,7 +20,7 @@ def fetch(uri: str) -> str:
     cache_file_path = (cache_root / uri_hash.hexdigest()).with_suffix(".html")
     if cache_file_path.is_file():
         cached_time = datetime.utcfromtimestamp(cache_file_path.stat().st_mtime)
-        if datetime.utcnow() < cached_time + timedelta(seconds=3600):
+        if datetime.utcnow() < cached_time + timedelta(seconds=CACHE_TIMEOUT):
             return cache_file_path.read_text("utf-8", errors="strict")
 
     # Otherwise, download the resource
@@ -32,17 +34,19 @@ def enum_millimeter_ranges(s: str) -> Iterator[Tuple[float, float]]:
         (float(n1), float(n2))
         for n1, n2 in re.findall(r"([\d\.]+)(?:mm)?\s*-\s*([\d\.]+)mm", s)
     ]
-    for n1, n2 in pairs:
-        yield n1, n2
+    if pairs:
+        for n1, n2 in pairs:
+            yield n1, n2
         return  # do not try extracting single value if a range found
 
     singles = [float(n) for n in re.findall(r"([\d\.]+)mm", s)]
-    for n in singles:
-        yield n, n
+    if singles:
+        for n in singles:
+            yield n, n
 
 
 def enum_millimeter_values(s: str) -> Iterator[float]:
-    for number, unit in re.findall(r"([\d\.]+)\s*(m)", s):
+    for number, unit in re.findall(r"([\d\.]+)\s*(mm?)", s):
         if unit == "mm":
             ratio = 1.0
         elif unit == "m":
@@ -54,5 +58,12 @@ def enum_millimeter_values(s: str) -> Iterator[float]:
 
 
 def enum_f_numbers(s: str) -> Iterator[float]:
-    for number in re.findall(r"f/([\d\.]+)", s):
-        yield float(number)
+    f_numbers = re.findall(r"f/([\d\.]+)", s)
+    if f_numbers:
+        for number in f_numbers:
+            yield float(number)
+
+    numbers = re.findall(r"([\d\.]+)", s)
+    if numbers:
+        for number in numbers:
+            yield float(number)

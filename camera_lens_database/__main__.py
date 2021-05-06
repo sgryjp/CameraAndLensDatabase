@@ -33,13 +33,14 @@ def fetch(
         df = df.set_index("Name")["ID"]
         orig_id_map = {k.lower(): v.lower() for k, v in df.to_dict().items()}
 
-        lens_info = list(nikon.enumerate_lenses(True))
-        lens_info += list(nikon.enumerate_lenses(False))
+        lens_info = list(nikon.enumerate_lenses(0))
+        lens_info += list(nikon.enumerate_lenses(1))
+        lens_info += list(nikon.enumerate_lenses(2))
         with typer.progressbar(lens_info, label="Nikon Lens") as pbar:
             for name, uri in pbar:
                 spec = nikon.read_lens(name, uri)
                 if spec is None:
-                    continue
+                    continue  # Converters
                 orig_id = orig_id_map.get(spec.name.lower())
                 if orig_id is not None:
                     attrs = {k: v for k, v in spec.dict().items()}
