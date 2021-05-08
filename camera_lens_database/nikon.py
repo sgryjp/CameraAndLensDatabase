@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Iterator, Tuple, Union
+from typing import Dict, Iterator, List, Optional, Tuple, Union
 from urllib.parse import urljoin, urlparse
 from uuid import uuid4
 
@@ -79,16 +79,16 @@ def enumerate_lenses(typ: int = 0) -> Iterator[Tuple[str, str]]:
 
 
 def read_lens(name: str, uri: str) -> lenses.Lens:
-    mode_values = [  # TODO: Improve name
+    mode_values: List[Tuple[str, str, str, Optional[str]]] = [  # TODO: Improve name
         ("table.table-A01-group", "th", "td", None),
         ("a#spec ~ table", "td:first-child", "td:last-child", None),
         ("div#spec ~ table", "th", "td", "spec.html"),
     ]
 
     errors = []
-    for mode, selectors in enumerate(mode_values):
+    for mode, params in enumerate(mode_values):
         try:
-            return _read_lens(name, uri, selectors)
+            return _read_lens(name, uri, params)
         except ParseError as ex:
             errors.append((mode, ex))
 
@@ -99,8 +99,12 @@ def read_lens(name: str, uri: str) -> lenses.Lens:
     raise CameraLensDatabaseException(msg)
 
 
-def _read_lens(name: str, uri: str, selectors) -> lenses.Lens:
-    table_selector, key_cell_selector, value_cell_selector, subpath = selectors
+def _read_lens(
+    name: str,
+    uri: str,
+    params: Tuple[str, str, str, Optional[str]],
+) -> lenses.Lens:
+    table_selector, key_cell_selector, value_cell_selector, subpath = params
 
     if subpath is not None:
         uri = urljoin(uri, subpath)

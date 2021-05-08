@@ -21,7 +21,7 @@ class CacheAction(str, Enum):
 def fetch(
     lenses_csv: Path = typer.Option(Path("lenses.csv")),
     overwrite: bool = typer.Option(False, "--overwrite", "-o"),
-):
+) -> None:
     """Fetch the newest equipment data from the Web."""
     STR_COLUMNS = (lenses.KEY_BRAND, lenses.KEY_MOUNT, lenses.KEY_NAME)
 
@@ -69,10 +69,10 @@ def fetch(
 
 
 @app.command()
-def cache(action: CacheAction = typer.Argument(CacheAction.info)):
+def cache(action: CacheAction = typer.Argument(CacheAction.info)) -> None:
     """Do cache related operation."""
 
-    def print_error(func, path, exc_info):
+    def print_error(func, path, exc_info):  # type: ignore[no-untyped-def]
         _, ex, _ = exc_info
         msg = f"cannot remove '{path}': {str(ex)}"
         _logger.warning(msg)
