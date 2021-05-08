@@ -6,7 +6,7 @@ authors = ["Suguru Yamamoto <sgryjp@gmail.com>"]
 license = "MIT"
 
 [tool.poetry.scripts]
-camera-lens-database = "camera_lens_database.__main__:main"
+camera-lens-database = "camera_lens_database.__main__:app"
 
 [tool.poetry.dependencies]
 python = "^3.8.9"
