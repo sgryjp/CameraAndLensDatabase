@@ -3,6 +3,7 @@ import io
 import multiprocessing
 import sys
 import traceback
+from enum import Enum
 from functools import partial
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
@@ -14,12 +15,18 @@ from tqdm.std import tqdm
 
 from . import lenses, nikon
 
+_help_target = "Type of the equipment to scarpe"
 _help_max_workers = (
     "Number of worker processes to launch."
     " Specifying 0 launches as many processes as CPU cores."
 )
 _help_lenses_csv = "The lens database file to read for already known equipments' IDs."
 _help_output = "The file to store scraped spec data."
+
+
+class FetchTarget(str, Enum):
+    LENS: str = "lens"
+    CAMERA: str = "camera"
 
 
 def init() -> None:
@@ -42,6 +49,7 @@ def _read_nikon_lens(
 
 
 def main(
+    target: FetchTarget = typer.Argument(..., help=_help_target),
     lenses_csv: Path = typer.Option(Path("lenses.csv"), help=_help_lenses_csv),
     num_workers: int = typer.Option(
         0, "-j", "--max-workers", help=_help_max_workers, metavar="N"
@@ -53,6 +61,9 @@ def main(
     STR_COLUMNS = (lenses.KEY_BRAND, lenses.KEY_MOUNT, lenses.KEY_NAME)
 
     try:
+        if target != FetchTarget.LENS:
+            raise NotImplementedError()
+
         # Before fetching newest data, load already assigned equipment IDs
         orig_lens_data = pd.read_csv(lenses_csv)
         df = orig_lens_data.loc[:, ["ID", "Name"]]
