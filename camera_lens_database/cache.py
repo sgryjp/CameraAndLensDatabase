@@ -1,13 +1,10 @@
 """Command to control download cache."""
-import logging
 import shutil
 from enum import Enum
 
 import typer
 
 from . import cache_root
-
-_logger = logging.getLogger(__name__)
 
 
 class CacheAction(str, Enum):
@@ -21,7 +18,7 @@ def main(action: CacheAction = typer.Argument(CacheAction.info)) -> None:
     def print_error(func, path, exc_info):  # type: ignore[no-untyped-def]
         _, ex, _ = exc_info
         msg = f"cannot remove '{path}': {str(ex)}"
-        _logger.warning(msg)
+        typer.secho(msg, fg=typer.colors.YELLOW)
 
     if action == CacheAction.info:
         print(cache_root.absolute())

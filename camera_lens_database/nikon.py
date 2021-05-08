@@ -1,10 +1,10 @@
 import enum
-import logging
 from typing import Dict, Iterator, List, Optional, Tuple, Union
 from urllib.parse import urljoin, urlparse
 from uuid import uuid4
 
 import pydantic
+import typer
 from bs4 import BeautifulSoup, Tag
 from bs4.element import ResultSet
 
@@ -23,7 +23,6 @@ class EquipmentType(int, enum.Enum):
 MOUNT_F = "Nikon F"
 MOUNT_Z = "Nikon Z"
 
-_logger = logging.getLogger(__name__)
 _lenses_to_ignore = [
     "AF-S TELECONVERTER TC-14E III",
     "AF-S TELECONVERTER TC-20E III",
@@ -77,11 +76,9 @@ def enumerate_lenses(target: EquipmentType) -> Iterator[Tuple[str, str]]:
         # Check the destination looks fine
         pr = urlparse(raw_dest)
         if pr.hostname and pr.hostname != base_uri:
-            _logger.warning(
-                "skipped an item because it's not on the same server: %r",
-                anchor["href"],
-                base_uri,
-            )
+            msg = "skipped an item because it's not on the same server"
+            msg += f": {anchor['href']!r} <> {base_uri!r}"
+            typer.secho(msg, fg=typer.colors.YELLOW)
             continue
 
         # Construct an absolute URI
@@ -105,11 +102,10 @@ def read_lens(name: str, uri: str) -> lenses.Lens:
         except ParseError as ex:
             errors.append((mode, ex))
 
-    msg = f'cannot read spec of "{name}" from "{uri}"'
-    _logger.error(msg)
+    msglines = [f'cannot read spec of "{name}" from "{uri}"']
     for mode, e in errors:
-        _logger.error("  mode %d: %s", mode, str(e))
-    raise CameraLensDatabaseException(msg)
+        msglines.append(f"  mode {mode}: {str(e)}")
+    raise CameraLensDatabaseException("\n".join(msglines))
 
 
 def _read_lens(

@@ -1,5 +1,6 @@
 """Command to fetch internet resources."""
-import logging
+import io
+import traceback
 from pathlib import Path
 
 import pandas as pd
@@ -8,13 +9,11 @@ from tqdm import tqdm
 
 from . import lenses, nikon
 
-_logger = logging.getLogger(__name__)
-
 
 def main(
     lenses_csv: Path = typer.Option(Path("lenses.csv")),
     overwrite: bool = typer.Option(False, "--overwrite", "-o"),
-) -> None:
+) -> int:
     """Fetch the newest equipment data from the Web."""
     STR_COLUMNS = (lenses.KEY_BRAND, lenses.KEY_MOUNT, lenses.KEY_NAME)
 
@@ -57,5 +56,10 @@ def main(
             df.to_csv(lenses_csv, index=None, float_format="%g")
         else:
             print(df.to_csv(index=None, float_format="%g"))
+
+        return 0
     except Exception:
-        _logger.exception("")
+        with io.StringIO() as buf:
+            traceback.print_exc(file=buf)
+            typer.secho(str(buf.getvalue()), fg=typer.colors.RED)
+        return 1
