@@ -9,7 +9,7 @@ license = "MIT"
 camera-lens-database = "camera_lens_database.__main__:app"
 
 [tool.poetry.dependencies]
-python = "^3.8.9"
+python = "^3.7.9"
 beautifulsoup4 = "^4.9.3"
 colorama = "^0.4.4"
 lxml = "^4.6.3"
