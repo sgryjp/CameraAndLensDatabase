@@ -14,7 +14,6 @@ from tqdm.std import tqdm
 
 from . import lenses, nikon
 
-_orig_id_map: Dict[str, str] = {}
 _help_max_workers = (
     "Number of worker processes to launch."
     " Specifying 0 launches as many processes as CPU cores."
@@ -27,18 +26,18 @@ def init() -> None:
     multiprocessing.freeze_support()
 
 
-def _read_nikon_lens(params: Tuple[str, str]) -> Optional[Dict[str, Union[float, str]]]:
-    name, uri = params
+def _read_nikon_lens(
+    args: Tuple[str, str, Dict[str, str]]
+) -> Optional[Dict[str, Union[float, str]]]:
+    name, uri, orig_id_map = args
 
     lens = nikon.read_lens(name, uri)
     if lens is None:
         return  # Converters
 
-    orig_id = _orig_id_map.get(lens.name.lower())
+    orig_id = orig_id_map.get(lens.name.lower())
     if orig_id is not None:
-        attrs = {k: v for k, v in lens.dict().items()}
-        attrs[lenses.KEY_ID] = orig_id
-        lens = lenses.Lens(**attrs)
+        lens.id = orig_id
     return lens.dict()
 
 
@@ -58,7 +57,7 @@ def main(
         orig_lens_data = pd.read_csv(lenses_csv)
         df = orig_lens_data.loc[:, ["ID", "Name"]]
         df = df.set_index("Name")["ID"]
-        _orig_id_map = {k.lower(): v.lower() for k, v in df.to_dict().items()}
+        orig_id_map = {k.lower(): v.lower() for k, v in df.to_dict().items()}
 
         # Gather where to find spec data
         lens_info = list(nikon.enumerate_lenses(nikon.EquipmentType.F_LENS_OLD))
@@ -72,14 +71,17 @@ def main(
         elif num_workers != 1:
             common_ppp["max_workers"] = num_workers
 
+        # Add a common parameter to arguments for paralell processing function
+        ppargs = [(name, uri, orig_id_map) for name, uri in lens_info]
+
         # Fetch and analyze equipment specs
         ppp = dict(common_ppp, desc="Nikon Lens")  # see PEP 584
         specs: List[Dict[str, Union[float, str]]]
         if num_workers == 1:
-            with tqdm(lens_info, **ppp) as pbar:
-                spec_or_nones = [_read_nikon_lens(params) for params in pbar]
+            with tqdm(ppargs, **ppp) as pbar:
+                spec_or_nones = [_read_nikon_lens(ppargs) for ppargs in pbar]
         else:
-            pbar = process_map(_read_nikon_lens, lens_info, **ppp)
+            pbar = process_map(_read_nikon_lens, ppargs, **ppp)
             spec_or_nones = [spec for spec in pbar]
         specs = [spec for spec in spec_or_nones if spec is not None]
 
