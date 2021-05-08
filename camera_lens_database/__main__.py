@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 import typer
+from tqdm import tqdm
 
 from . import cache_root, lenses, nikon
 
@@ -36,7 +37,7 @@ def fetch(
         lens_info = list(nikon.enumerate_lenses(nikon.EquipmentType.F_LENS_OLD))
         lens_info += list(nikon.enumerate_lenses(nikon.EquipmentType.F_LENS))
         lens_info += list(nikon.enumerate_lenses(nikon.EquipmentType.Z_LENS))
-        with typer.progressbar(lens_info, label="Nikon Lens") as pbar:
+        with tqdm(lens_info, desc="Nikon Lens", unit="models") as pbar:
             for name, uri in pbar:
                 spec = nikon.read_lens(name, uri)
                 if spec is None:
