@@ -15,10 +15,11 @@ from tqdm.std import tqdm
 from . import lenses, nikon
 
 _orig_id_map: Dict[str, str] = {}
-_help_main_max_workers = (
-    "Number of worker processes to launch concurrently. "
-    "Specifying 0 launches the as many as CPU cores."
+_help_max_workers = (
+    "Number of worker processes to launch."
+    " Specifying 0 launches as many processes as CPU cores."
 )
+_help_lenses_csv = "The lens database file to read for already known equipments' IDs."
 _help_output = "The file to store scraped spec data."
 
 
@@ -42,9 +43,9 @@ def _read_nikon_lens(params: Tuple[str, str]) -> Optional[Dict[str, Union[float,
 
 
 def main(
-    lenses_csv: Path = typer.Option(Path("lenses.csv")),
-    max_workers: int = typer.Option(
-        0, "-j", "--max-workers", help=_help_main_max_workers
+    lenses_csv: Path = typer.Option(Path("lenses.csv"), help=_help_lenses_csv),
+    num_workers: int = typer.Option(
+        0, "-j", "--max-workers", help=_help_max_workers, metavar="N"
     ),
     output: Optional[Path] = typer.Option(None, "-o", "--output", help=_help_output),
 ) -> int:
@@ -66,15 +67,15 @@ def main(
 
         # Resolve parallel processing parameters
         common_ppp: Dict[str, Union[int, str]] = {"unit": "models"}
-        if max_workers <= 0:
+        if num_workers <= 0:
             common_ppp["max_workers"] = multiprocessing.cpu_count()
-        elif max_workers != 1:
-            common_ppp["max_workers"] = max_workers
+        elif num_workers != 1:
+            common_ppp["max_workers"] = num_workers
 
         # Fetch and analyze equipment specs
         ppp = dict(common_ppp, desc="Nikon Lens")  # see PEP 584
         specs: List[Dict[str, Union[float, str]]]
-        if max_workers == 1:
+        if num_workers == 1:
             with tqdm(lens_info, **ppp) as pbar:
                 spec_or_nones = [_read_nikon_lens(params) for params in pbar]
         else:
