@@ -1,7 +1,9 @@
 """Command to fetch internet resources."""
 import io
 import multiprocessing
+import sys
 import traceback
+from functools import partial
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
 
@@ -17,6 +19,7 @@ _help_main_max_workers = (
     "Number of worker processes to launch concurrently. "
     "Specifying 0 launches the as many as CPU cores."
 )
+_help_output = "The file to store scraped spec data."
 
 
 def init() -> None:
@@ -43,7 +46,7 @@ def main(
     max_workers: int = typer.Option(
         0, "-j", "--max-workers", help=_help_main_max_workers
     ),
-    overwrite: bool = typer.Option(False, "--overwrite", "-o"),
+    output: Optional[Path] = typer.Option(None, "-o", "--output", help=_help_output),
 ) -> int:
     """Fetch the newest equipment data from the Web."""
     global _orig_id_map
@@ -94,10 +97,12 @@ def main(
         )
 
         # Now output it
-        if overwrite:
-            df.to_csv(lenses_csv, index=None, float_format="%g")
+        write = partial(df.to_csv, index=None, float_format="%g")
+        if output is None:
+            write(sys.stdout)
         else:
-            print(df.to_csv(index=None, float_format="%g"))
+            with open(output, "wb") as f:
+                write(f)
 
         return 0
     except Exception:
