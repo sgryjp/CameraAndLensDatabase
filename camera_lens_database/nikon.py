@@ -1,3 +1,4 @@
+import enum
 import logging
 from typing import Dict, Iterator, List, Optional, Tuple, Union
 from urllib.parse import urljoin, urlparse
@@ -10,6 +11,14 @@ from bs4.element import ResultSet
 from . import config, lenses
 from .exceptions import CameraLensDatabaseException, ParseError
 from .utils import enum_f_numbers, enum_millimeter_ranges, enum_millimeter_values, fetch
+
+
+@enum.unique
+class EquipmentType(int, enum.Enum):
+    F_LENS_OLD = enum.auto()
+    F_LENS = enum.auto()
+    Z_LENS = enum.auto()
+
 
 MOUNT_F = "Nikon F"
 MOUNT_Z = "Nikon Z"
@@ -40,13 +49,17 @@ _known_lens_specs: Dict[str, Dict[str, Union[float, str]]] = {
 }
 
 
-def enumerate_lenses(typ: int = 0) -> Iterator[Tuple[str, str]]:
-    if typ == 0:
+def enumerate_lenses(target: EquipmentType) -> Iterator[Tuple[str, str]]:
+    if target == EquipmentType.F_LENS_OLD:
         base_uri = "https://www.nikon-image.com/products/nikkor/discontinue_fmount/"
-    elif typ == 1:
+    elif target == EquipmentType.F_LENS:
         base_uri = "https://www.nikon-image.com/products/nikkor/fmount/index.html"
-    else:
+    elif target == EquipmentType.Z_LENS:
         base_uri = "https://www.nikon-image.com/products/nikkor/zmount/index.html"
+    else:
+        msg = f"unsupported type to enumerate: {target}"
+        raise ValueError(msg)
+
     html_text = fetch(base_uri)
     soup = BeautifulSoup(html_text, features=config["bs_features"])
     for anchor in soup.select(".mod-goodsList-ul > li > a"):
