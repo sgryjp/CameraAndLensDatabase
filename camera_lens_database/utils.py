@@ -63,7 +63,7 @@ def enum_f_numbers(s: str) -> Iterator[float]:
         for number in f_numbers:
             yield float(number)
 
-    numbers = re.findall(r"([\d\.]+)", s)
+    numbers = re.findall(r"([\d\.]+)(?![m\d])", s)
     if numbers:
         for number in numbers:
             yield float(number)

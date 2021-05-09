@@ -1,4 +1,5 @@
 import enum
+import re
 from typing import Dict, Iterator, List, Optional, Tuple, Union
 from urllib.parse import urljoin, urlparse
 from uuid import uuid4
@@ -45,6 +46,13 @@ _known_lens_specs: Dict[str, Dict[str, Union[float, str]]] = {
     "AI AF Zoom Nikkor 24～50mm F3.3～4.5D": {
         lenses.KEY_MIN_FOCUS_DISTANCE: 600,
     },
+    "AI Micro-Nikkor 55mm f/2.8S": {
+        lenses.KEY_MIN_FOCUS_DISTANCE: 250,
+    },
+    "AI Micro-Nikkor 105mm f/2.8S": {
+        lenses.KEY_MIN_FOCAL_LENGTH: 105,
+        lenses.KEY_MIN_FOCUS_DISTANCE: 410,
+    }
 }
 
 
@@ -64,7 +72,7 @@ def enumerate_lenses(target: EquipmentType) -> Iterator[Tuple[str, str]]:
     for anchor in soup.select(".mod-goodsList-ul > li > a"):
         # Get the equipment name
         name: str = anchor.select(".mod-goodsList-title")[0].text
-        name = name.rstrip(" 旧製品")
+        name = _normalize_name(name)
         if name in _lenses_to_ignore:
             continue
 
@@ -183,6 +191,7 @@ def recognize_lens_term(key: str, value: str) -> Dict[str, Union[float, str]]:
         if mount is not None:
             return {lenses.KEY_MOUNT: mount}
     elif key == "焦点距離":
+        value = _remove_parens(value)
         ranges = list(enum_millimeter_ranges(value))
         if ranges:
             return {
@@ -190,6 +199,7 @@ def recognize_lens_term(key: str, value: str) -> Dict[str, Union[float, str]]:
                 lenses.KEY_MAX_FOCAL_LENGTH: max(n for _, n in ranges),
             }
     elif key == "最短撮影距離":
+        value = _remove_parens(value)
         values = list(enum_millimeter_values(value))
         if values:
             return {lenses.KEY_MIN_FOCUS_DISTANCE: min(values)}
@@ -214,3 +224,27 @@ def _parse_mount_name(s: str) -> str:
     else:
         msg = f"unrecognizable mount description: {s}"
         raise ParseError(msg)
+
+
+def _to_half_width(s: str) -> str:
+    s = re.sub(r"（([^）]+)）", r"(\g<1>)", s)
+    s = re.sub(r"(?<=\d)～(?=[\dF])", "-", s)
+    return s
+
+
+def _remove_parens(s: str) -> str:
+    s = _to_half_width(s)
+    s = re.sub(r"（[^）]+）", "", s)
+    s = re.sub(r"\([^\)]+\)", "", s)
+    s = re.sub(
+        r"\[([\d\.m]+)\s*[：:]\s*[^\]]+\]", r" \g<1>", s
+    )  # [0.21m：85mmマクロ時] --> 0.21m
+    return s
+
+
+def _normalize_name(name: str) -> str:
+    name = _to_half_width(name)
+    name = re.sub(r"\s*(旧製品|＜NEW＞)$", "", name)
+    name = re.sub(r"NIKKOR", "Nikkor", name, re.IGNORECASE)
+    name = re.sub(r"(?<=[^\s])\(", " (", name)  # Insert space before an opening paren
+    return name
