@@ -7,5 +7,5 @@ if __name__ == "__main__":
     root = Path(__file__).parent.parent
 
     dirs = ["camera_lens_database", "tools"]
-    check_call(f"flake8 {' '.join(dirs)}", cwd=root)
-    check_call(f"mypy {' '.join(dirs)}", cwd=root)
+    check_call(["flake8"] + dirs, cwd=root)
+    check_call(["mypy"] + dirs, cwd=root)
