@@ -2,7 +2,7 @@ import multiprocessing
 import re
 from datetime import datetime, timedelta
 from hashlib import sha256
-from typing import Callable, Dict, Iterable, Iterator, List, Tuple, TypeVar, Union
+from typing import Callable, Iterable, Iterator, List, Tuple, TypeVar
 
 import requests
 import tqdm.auto
@@ -42,14 +42,13 @@ def parallel_apply(
     num_workers: int,
 ) -> List[S]:
     # Resolve parallel processing parameters
-    tqdm_params: Dict[str, Union[int, str]] = {"unit": "models"}
+    tqdm_params = {"unit": "models", "max_workers": num_workers}
     if num_workers <= 0:
         tqdm_params["max_workers"] = multiprocessing.cpu_count()
-    elif num_workers != 1:
-        tqdm_params["max_workers"] = num_workers
 
-    # Execute
+    # Process the iterable
     if num_workers == 1:
+        del tqdm_params["max_workers"]
         with tqdm.auto.tqdm(iterable, **tqdm_params) as pbar:
             results = [f(args) for args in pbar]
     else:
