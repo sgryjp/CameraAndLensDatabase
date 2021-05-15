@@ -11,7 +11,7 @@ class Lens(BaseModel):
     min_f_value: float
     max_f_value: float
     min_focus_distance: float
-    comment: str
+    keywords: str
 
 
 (
@@ -24,5 +24,5 @@ class Lens(BaseModel):
     KEY_MIN_F_VALUE,
     KEY_MAX_F_VALUE,
     KEY_MIN_FOCUS_DISTANCE,
-    KEY_COMMENT,
+    KEY_KEYWORDS,
 ) = Lens.__fields__.keys()

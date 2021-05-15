@@ -147,7 +147,7 @@ def _read_lens(
         lenses.KEY_ID: str(uuid4()),
         lenses.KEY_NAME: name,
         lenses.KEY_BRAND: "Nikon",
-        lenses.KEY_COMMENT: "",
+        lenses.KEY_KEYWORDS: "",
     }
     if "fmount/" in uri:
         pairs[lenses.KEY_MOUNT] = MOUNT_F
