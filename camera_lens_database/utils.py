@@ -1,13 +1,19 @@
+import multiprocessing
 import re
 from datetime import datetime, timedelta
 from hashlib import sha256
-from typing import Iterator, Tuple
+from typing import Callable, Dict, Iterable, Iterator, List, Tuple, TypeVar, Union
 
 import requests
+import tqdm.auto
+import tqdm.contrib.concurrent
 
 from . import cache_root
 
 CACHE_TIMEOUT = 8 * 3600
+
+T = TypeVar("T")
+S = TypeVar("S")
 
 
 def fetch(uri: str) -> str:
@@ -27,6 +33,31 @@ def fetch(uri: str) -> str:
     resp = requests.get(uri)
     cache_file_path.write_text(resp.text, encoding="utf-8", errors="replace")
     return resp.text
+
+
+def parallel_apply(
+    iterable: Iterable[T],
+    f: Callable[[T], S],
+    *,
+    description: str,
+    num_workers: int,
+) -> List[S]:
+    # Resolve parallel processing parameters
+    tqdm_params: Dict[str, Union[int, str]] = {"unit": "models", "desc": description}
+    if num_workers <= 0:
+        tqdm_params["max_workers"] = multiprocessing.cpu_count()
+    elif num_workers != 1:
+        tqdm_params["max_workers"] = num_workers
+
+    # Execute
+    if num_workers == 1:
+        with tqdm.auto.tqdm(iterable, **tqdm_params) as pbar:
+            results = [f(args) for args in pbar]
+    else:
+        pbar = tqdm.contrib.concurrent.process_map(f, iterable, **tqdm_params)
+        results = [spec for spec in pbar]
+
+    return results
 
 
 def enum_millimeter_ranges(s: str) -> Iterator[Tuple[float, float]]:

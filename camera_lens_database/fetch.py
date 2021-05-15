@@ -10,10 +10,8 @@ from typing import Dict, List, Optional, Tuple, Union
 
 import pandas as pd
 import typer
-from tqdm.contrib.concurrent import process_map
-from tqdm.std import tqdm
 
-from . import lenses, nikon
+from . import lenses, nikon, utils
 
 _help_target = "Type of the equipment to scarpe"
 _help_max_workers = (
@@ -75,25 +73,13 @@ def main(
         lens_info += list(nikon.enumerate_lenses(nikon.EquipmentType.F_LENS))
         lens_info += list(nikon.enumerate_lenses(nikon.EquipmentType.Z_LENS))
 
-        # Resolve parallel processing parameters
-        common_ppp: Dict[str, Union[int, str]] = {"unit": "models"}
-        if num_workers <= 0:
-            common_ppp["max_workers"] = multiprocessing.cpu_count()
-        elif num_workers != 1:
-            common_ppp["max_workers"] = num_workers
-
         # Add a common parameter to arguments for paralell processing function
         ppargs = [(name, uri, orig_id_map) for name, uri in lens_info]
 
         # Fetch and analyze equipment specs
-        ppp = dict(common_ppp, desc="Nikon Lens")  # see PEP 584
-        specs: List[Dict[str, Union[float, str]]]
-        if num_workers == 1:
-            with tqdm(ppargs, **ppp) as pbar:
-                spec_or_nones = [_read_nikon_lens(ppargs) for ppargs in pbar]
-        else:
-            pbar = process_map(_read_nikon_lens, ppargs, **ppp)
-            spec_or_nones = [spec for spec in pbar]
+        spec_or_nones = utils.parallel_apply(
+            ppargs, _read_nikon_lens, description="Nikon Lens", num_workers=num_workers
+        )
         specs = [spec for spec in spec_or_nones if spec is not None]
 
         # Sort the result
