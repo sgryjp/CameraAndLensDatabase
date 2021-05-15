@@ -32,18 +32,13 @@ def init() -> None:
     multiprocessing.freeze_support()
 
 
-def _read_nikon_lens(
-    args: Tuple[str, str, Dict[str, str]]
-) -> Optional[Dict[str, Union[float, str]]]:
-    name, uri, orig_id_map = args
+def _read_nikon_lens(args: Tuple[str, str]) -> Optional[Dict[str, Union[float, str]]]:
+    name, uri = args
 
     lens = nikon.read_lens(name, uri)
     if lens is None:
         return  # Converters
 
-    orig_id = orig_id_map.get(lens.name.lower())
-    if orig_id is not None:
-        lens.id = orig_id
     return lens.dict()
 
 
@@ -77,19 +72,26 @@ def main(
             ]
             detail_fetcher = _read_nikon_lens
 
-        # Before fetching newest data, load already assigned equipment IDs
+        # Before fetching the newest data, load already assigned equipment IDs
         orig_data = pd.read_csv(orig_data_path).set_index("Name")["ID"]
         orig_id_map = {k.lower(): v.lower() for k, v in orig_data.to_dict().items()}
 
         # Query equipments with location of thier spec data.
-        # Also, add a common parameter to arguments for paralell processing function.
-        ppargs = [(name, uri, orig_id_map) for name, uri in name_uri_pairs]
+        ppargs = list(name_uri_pairs)
 
         # Fetch and analyze equipment specs
         spec_or_nones = utils.parallel_apply(
             ppargs, detail_fetcher, num_workers=num_workers
         )
         specs = [spec for spec in spec_or_nones if spec is not None]
+
+        # Reuse already assigned IDs
+        for spec in specs:
+            name = spec["name"]
+            assert isinstance(name, str)
+            already_assigned_id = orig_id_map.get(name.lower())
+            if already_assigned_id is not None:
+                spec["id"] = already_assigned_id
 
         # Sort the result
         df = pd.DataFrame(specs).sort_values(
