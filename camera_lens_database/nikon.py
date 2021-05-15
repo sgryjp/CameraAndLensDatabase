@@ -52,7 +52,7 @@ _known_lens_specs: Dict[str, Dict[str, Union[float, str]]] = {
     "AI Micro-Nikkor 105mm f/2.8S": {
         lenses.KEY_MIN_FOCAL_LENGTH: 105,
         lenses.KEY_MIN_FOCUS_DISTANCE: 410,
-    }
+    },
 }
 
 
@@ -154,7 +154,7 @@ def _read_lens(
 
         key_cell_text = key_cells[0].text.strip()
         value_cell_text = value_cells[0].text.strip()
-        for k, v in recognize_lens_term(key_cell_text, value_cell_text).items():
+        for k, v in _recognize_lens_property(key_cell_text, value_cell_text).items():
             pairs[k] = v
 
     # Try extracting some specs from the model name
@@ -162,10 +162,10 @@ def _read_lens(
         lenses.KEY_MIN_FOCAL_LENGTH not in pairs
         or lenses.KEY_MAX_FOCAL_LENGTH not in pairs
     ):
-        for k, v in recognize_lens_term("焦点距離", name).items():
+        for k, v in _recognize_lens_property("焦点距離", name).items():
             pairs[k] = v
     if lenses.KEY_MIN_F_VALUE not in pairs:
-        for k, v in recognize_lens_term("最大絞り", name).items():
+        for k, v in _recognize_lens_property("最大絞り", name).items():
             pairs[k] = v
 
     # Force using some spec data which is not available or hard to recognize
@@ -185,7 +185,7 @@ def _read_lens(
         raise CameraLensDatabaseException(f"unexpected spec: {pairs}") from ex
 
 
-def recognize_lens_term(key: str, value: str) -> Dict[str, Union[float, str]]:
+def _recognize_lens_property(key: str, value: str) -> Dict[str, Union[float, str]]:
     if key == "型式":
         mount = _parse_mount_name(value)
         if mount is not None:
