@@ -53,7 +53,7 @@ def main(
         0, "-j", "--max-workers", help=_help_max_workers, metavar="N"
     ),
     output: Optional[Path] = typer.Option(None, "-o", "--output", help=_help_output),
-) -> int:
+):
     """Fetch the newest equipment data from the Web."""
     global _orig_id_map
     STR_COLUMNS = (lenses.KEY_BRAND, lenses.KEY_MOUNT, lenses.KEY_NAME)
@@ -104,9 +104,8 @@ def main(
             with open(output, "wb") as f:
                 write(f)
 
-        return 0
     except Exception:
         with io.StringIO() as buf:
             traceback.print_exc(file=buf)
             typer.secho(str(buf.getvalue()), fg=typer.colors.RED)
-        return 1
+        raise typer.Exit(1)
