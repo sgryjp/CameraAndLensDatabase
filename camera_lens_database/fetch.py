@@ -1,12 +1,13 @@
 """Command to fetch internet resources."""
 import io
+import itertools
 import multiprocessing
 import sys
 import traceback
 from enum import Enum
 from functools import partial
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, Optional, Tuple, Union
 
 import pandas as pd
 import typer
@@ -60,37 +61,39 @@ def main(
     try:
         if target != FetchTarget.LENS:
             raise NotImplementedError()
-
-        # Before fetching newest data, load already assigned equipment IDs
-        orig_lens_data = pd.read_csv(lenses_csv)
-        df = orig_lens_data.loc[:, ["ID", "Name"]]
-        df = df.set_index("Name")["ID"]
-        orig_id_map = {k.lower(): v.lower() for k, v in df.to_dict().items()}
-
-        # Gather where to find spec data
-        lens_info = list(nikon.enumerate_lenses(nikon.EquipmentType.F_LENS_OLD))
-        lens_info += list(nikon.enumerate_lenses(nikon.EquipmentType.F_LENS))
-        lens_info += list(nikon.enumerate_lenses(nikon.EquipmentType.Z_LENS))
-
-        # Add a common parameter to arguments for paralell processing function
-        ppargs = [(name, uri, orig_id_map) for name, uri in lens_info]
-
-        # Fetch and analyze equipment specs
-        spec_or_nones = utils.parallel_apply(
-            ppargs, _read_nikon_lens, num_workers=num_workers
-        )
-        specs = [spec for spec in spec_or_nones if spec is not None]
-
-        # Sort the result
-        df = pd.DataFrame(specs)
-        df = df.sort_values(
-            by=[
+        else:
+            orig_data_path = lenses_csv
+            name_uri_pairs = itertools.chain(
+                nikon.enumerate_lenses(nikon.EquipmentType.F_LENS_OLD),
+                nikon.enumerate_lenses(nikon.EquipmentType.F_LENS),
+                nikon.enumerate_lenses(nikon.EquipmentType.Z_LENS),
+            )
+            sort_keys = [
                 lenses.KEY_BRAND,
                 lenses.KEY_MOUNT,
                 lenses.KEY_MIN_FOCAL_LENGTH,
                 lenses.KEY_MAX_FOCAL_LENGTH,
                 lenses.KEY_NAME,
-            ],
+            ]
+            detail_fetcher = _read_nikon_lens
+
+        # Before fetching newest data, load already assigned equipment IDs
+        orig_data = pd.read_csv(orig_data_path).set_index("Name")["ID"]
+        orig_id_map = {k.lower(): v.lower() for k, v in orig_data.to_dict().items()}
+
+        # Scrape equipments and location of thier spec data.
+        # Also, add a common parameter to arguments for paralell processing function.
+        ppargs = [(name, uri, orig_id_map) for name, uri in name_uri_pairs]
+
+        # Fetch and analyze equipment specs
+        spec_or_nones = utils.parallel_apply(
+            ppargs, detail_fetcher, num_workers=num_workers
+        )
+        specs = [spec for spec in spec_or_nones if spec is not None]
+
+        # Sort the result
+        df = pd.DataFrame(specs).sort_values(
+            by=sort_keys,
             kind="mergesort",
             key=lambda c: c.str.lower() if str(c) in STR_COLUMNS else c,
         )
