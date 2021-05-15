@@ -81,7 +81,7 @@ def main(
         orig_data = pd.read_csv(orig_data_path).set_index("Name")["ID"]
         orig_id_map = {k.lower(): v.lower() for k, v in orig_data.to_dict().items()}
 
-        # Scrape equipments and location of thier spec data.
+        # Query equipments with location of thier spec data.
         # Also, add a common parameter to arguments for paralell processing function.
         ppargs = [(name, uri, orig_id_map) for name, uri in name_uri_pairs]
 
