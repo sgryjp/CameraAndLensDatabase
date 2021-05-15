@@ -77,7 +77,7 @@ def main(
 
         # Fetch and analyze equipment specs
         spec_or_nones = utils.parallel_apply(
-            ppargs, _read_nikon_lens, description="Nikon Lens", num_workers=num_workers
+            ppargs, _read_nikon_lens, num_workers=num_workers
         )
         specs = [spec for spec in spec_or_nones if spec is not None]
 

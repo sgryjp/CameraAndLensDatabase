@@ -39,11 +39,10 @@ def parallel_apply(
     iterable: Iterable[T],
     f: Callable[[T], S],
     *,
-    description: str,
     num_workers: int,
 ) -> List[S]:
     # Resolve parallel processing parameters
-    tqdm_params: Dict[str, Union[int, str]] = {"unit": "models", "desc": description}
+    tqdm_params: Dict[str, Union[int, str]] = {"unit": "models"}
     if num_workers <= 0:
         tqdm_params["max_workers"] = multiprocessing.cpu_count()
     elif num_workers != 1:
