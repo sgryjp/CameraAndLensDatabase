@@ -7,7 +7,7 @@ import traceback
 from enum import Enum
 from functools import partial
 from pathlib import Path
-from typing import Dict, Optional, Tuple, Union
+from typing import Optional, Tuple
 
 import pandas as pd
 import typer
@@ -32,14 +32,8 @@ def init() -> None:
     multiprocessing.freeze_support()
 
 
-def _read_nikon_lens(args: Tuple[str, str]) -> Optional[Dict[str, Union[float, str]]]:
-    name, uri = args
-
-    lens = nikon.read_lens(name, uri)
-    if lens is None:
-        return  # Converters
-
-    return lens.dict()
+def _read_nikon_lens(args: Tuple[str, str]) -> Optional[lenses.Lens]:
+    return nikon.read_lens(*args)
 
 
 def main(
@@ -87,14 +81,12 @@ def main(
 
         # Reuse already assigned IDs
         for spec in specs:
-            name = spec["name"]
-            assert isinstance(name, str)
-            already_assigned_id = orig_id_map.get(name.lower())
+            already_assigned_id = orig_id_map.get(spec.name.lower())
             if already_assigned_id is not None:
-                spec["id"] = already_assigned_id
+                spec.id = already_assigned_id
 
         # Sort the result
-        df = pd.DataFrame(specs).sort_values(
+        df = pd.DataFrame([s.dict() for s in specs]).sort_values(
             by=sort_keys,
             kind="mergesort",
             key=lambda c: c.str.lower() if str(c) in STR_COLUMNS else c,
