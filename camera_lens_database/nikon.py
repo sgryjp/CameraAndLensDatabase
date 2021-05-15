@@ -9,9 +9,15 @@ import typer
 from bs4 import BeautifulSoup, Tag
 from bs4.element import ResultSet
 
-from . import config, lenses
+from . import cameras, config, lenses
 from .exceptions import CameraLensDatabaseException, ParseError
-from .utils import enum_f_numbers, enum_millimeter_ranges, enum_millimeter_values, fetch
+from .utils import (
+    enum_f_numbers,
+    enum_millimeter_ranges,
+    enum_millimeter_values,
+    enum_square_millimeters,
+    fetch,
+)
 
 
 @enum.unique
@@ -19,6 +25,7 @@ class EquipmentType(int, enum.Enum):
     F_LENS_OLD = enum.auto()
     F_LENS = enum.auto()
     Z_LENS = enum.auto()
+    SLR = enum.auto()
 
 
 MOUNT_F = "Nikon F"
@@ -56,13 +63,15 @@ _known_lens_specs: Dict[str, Dict[str, Union[float, str]]] = {
 }
 
 
-def enumerate_lenses(target: EquipmentType) -> Iterator[Tuple[str, str]]:
+def enum_equipments(target: EquipmentType) -> Iterator[Tuple[str, str]]:
     if target == EquipmentType.F_LENS_OLD:
         base_uri = "https://www.nikon-image.com/products/nikkor/discontinue_fmount/"
     elif target == EquipmentType.F_LENS:
         base_uri = "https://www.nikon-image.com/products/nikkor/fmount/index.html"
     elif target == EquipmentType.Z_LENS:
         base_uri = "https://www.nikon-image.com/products/nikkor/zmount/index.html"
+    elif target == EquipmentType.SLR:
+        base_uri = "https://www.nikon-image.com/products/slr/"
     else:
         msg = f"unsupported type to enumerate: {target}"
         raise ValueError(msg)
@@ -248,3 +257,91 @@ def _normalize_name(name: str) -> str:
     name = re.sub(r"NIKKOR", "Nikkor", name, re.IGNORECASE)
     name = re.sub(r"(?<=[^\s])\(", " (", name)  # Insert space before an opening paren
     return name
+
+
+def read_camera(name: str, uri: str) -> cameras.Camera:
+    mode_values: List[Tuple[str, str, str, Optional[str]]] = [  # TODO: Improve name
+        # ("table.table-A01-group", "th", "td", None),
+        # ("a#spec ~ table", "td:first-child", "td:last-child", None),
+        ("div#spec ~ table", "th", "td", "spec.html"),
+    ]
+
+    errors = []
+    for mode, params in enumerate(mode_values):
+        try:
+            return _read_camera(name, uri, params)
+        except ParseError as ex:
+            errors.append((mode, ex))
+
+    msglines = [f'cannot read spec of "{name}" from "{uri}"']
+    for mode, e in errors:
+        msglines.append(f"  mode {mode}: {str(e)}")
+    raise CameraLensDatabaseException("\n".join(msglines))
+
+
+def _read_camera(
+    name: str, uri: str, params: Tuple[str, str, str, Optional[str]]
+) -> cameras.Camera:
+    table_selector, key_cell_selector, value_cell_selector, subpath = params
+
+    if subpath is not None:
+        uri = urljoin(uri, subpath)
+
+    html_text = fetch(uri)
+    soup = BeautifulSoup(html_text, config["bs_features"])
+    selection = soup.select(table_selector)
+    if len(selection) <= 0:
+        msg = "spec table not found"
+        raise ParseError(msg)
+
+    # Set initial values
+    pairs: Dict[str, Union[float, str]] = {
+        cameras.KEY_ID: str(uuid4()),
+        cameras.KEY_NAME: name,
+        cameras.KEY_BRAND: "Nikon",
+        cameras.KEY_KEYWORDS: "",
+    }
+
+    # Collect and parse interested th-td pairs from the spec table
+    spec_table: Tag = selection[0]
+    for row in spec_table.select("tr"):
+        key_cells: ResultSet = row.select(key_cell_selector)
+        value_cells: ResultSet = row.select(value_cell_selector)
+        if len(key_cells) != 1 or len(value_cells) != 1:
+            continue
+
+        key_cell_text = key_cells[0].text.strip()
+        value_cell_text = value_cells[0].text.strip()
+        for k, v in _recognize_camera_prop(key_cell_text, value_cell_text).items():
+            pairs[k] = v
+
+    # Compose a spec object from the table content
+    try:
+        return cameras.Camera(**pairs)
+    except pydantic.ValidationError as ex:
+        raise CameraLensDatabaseException(f"unexpected spec: {pairs}") from ex
+
+
+def _recognize_camera_prop(key: str, value: str) -> Dict[str, Union[float, str]]:
+    if key == "レンズマウント":
+        mount = _parse_mount_name(value)
+        if mount is not None:
+            return {cameras.KEY_MOUNT: mount}
+
+    elif key == "撮像素子":
+        props: Dict[str, Union[float, str]] = {}
+
+        areas = list(enum_square_millimeters(value))
+        if len(areas) == 1:
+            w, h = areas[0]
+            props[cameras.KEY_MEDIA_WIDTH] = w
+            props[cameras.KEY_MEDIA_HEIGHT] = h
+
+        match = re.search(r"(DX|FX)\s*フォーマット", value)
+        if match:
+            props[cameras.KEY_SIZE_NAME] = match.group(1).upper()
+
+        if props:
+            return props
+
+    return {}

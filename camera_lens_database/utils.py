@@ -86,6 +86,15 @@ def enum_millimeter_values(s: str) -> Iterator[float]:
         yield float(number) * ratio
 
 
+def enum_square_millimeters(s: str) -> Iterator[Tuple[float, float]]:
+    pairs = [
+        (float(n1), float(n2)) for n1, n2 in re.findall(r"([\d\.]+)×([\d\.]+)mm", s)
+    ]
+    if pairs:
+        for n1, n2 in pairs:
+            yield n1, n2
+
+
 def enum_f_numbers(s: str) -> Iterator[float]:
     f_numbers = re.findall(r"f/([\d\.]+)", s)
     if f_numbers:
