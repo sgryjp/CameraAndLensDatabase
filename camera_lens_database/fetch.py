@@ -55,7 +55,6 @@ def main(
     output: Optional[Path] = typer.Option(None, "-o", "--output", help=_help_output),
 ):
     """Fetch the newest equipment data from the Web."""
-    global _orig_id_map
     STR_COLUMNS = (lenses.KEY_BRAND, lenses.KEY_MOUNT, lenses.KEY_NAME)
 
     try:
