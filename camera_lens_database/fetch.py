@@ -6,21 +6,19 @@ import sys
 import traceback
 from enum import Enum
 from functools import partial
-from pathlib import Path
 from typing import Callable, Optional, Tuple, Union
 
+import click
 import pandas as pd
-import typer
 
 from . import cameras, lenses, nikon, utils
 
-_help_target = "Type of the equipment to scarpe"
 _help_max_workers = (
     "Number of worker processes to launch."
     " Specifying 0 launches as many processes as CPU cores."
 )
-_help_lenses_csv = "The lens database file."
-_help_cameras_csv = "The camera database file."
+_help_lenses_csv = "The lens database file (source of already known equipment IDs)."
+_help_cameras_csv = "The camera database file (source of already known equipment IDs)."
 _help_output = "The file to store scraped spec data."
 
 
@@ -41,14 +39,38 @@ def _read_nikon_camera(args: Tuple[str, str]) -> Optional[cameras.Camera]:
     return nikon.read_camera(*args)
 
 
+@click.command()
+@click.argument("target", type=FetchTarget)
+@click.option(
+    "--lenses-csv",
+    type=click.Path(exists=True),
+    default="lenses.csv",
+    help=_help_lenses_csv,
+)
+@click.option(
+    "--cameras-csv",
+    type=click.Path(exists=True),
+    default="cameras.csv",
+    help=_help_cameras_csv,
+)
+@click.option(
+    "-j", "--num-workers", type=int, default=0, metavar="N", help=_help_max_workers
+)
+@click.option(
+    "-o",
+    "--output",
+    type=click.Path(dir_okay=False, writable=True),
+    default=None,
+    help=_help_output,
+)
+@click.pass_context
 def main(
-    target: FetchTarget = typer.Argument(..., help=_help_target),
-    lenses_csv: Path = typer.Option(Path("lenses.csv"), help=_help_lenses_csv),
-    cameras_csv: Path = typer.Option(Path("cameras.csv"), help=_help_cameras_csv),
-    num_workers: int = typer.Option(
-        0, "-j", "--max-workers", help=_help_max_workers, metavar="N"
-    ),
-    output: Optional[Path] = typer.Option(None, "-o", "--output", help=_help_output),
+    ctx: click.Context,
+    target: FetchTarget,
+    lenses_csv: str,
+    cameras_csv: str,
+    num_workers: int,
+    output: Optional[str],
 ) -> None:
     """Fetch the newest equipment data from the Web."""
     STR_COLUMNS = (lenses.KEY_BRAND, lenses.KEY_MOUNT, lenses.KEY_NAME)
@@ -124,5 +146,5 @@ def main(
     except Exception:
         with io.StringIO() as buf:
             traceback.print_exc(file=buf)
-            typer.secho(str(buf.getvalue()), fg=typer.colors.RED)
-        raise typer.Exit(1)
+            click.secho(str(buf.getvalue()), fg="red")
+        ctx.exit(1)

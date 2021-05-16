@@ -11,13 +11,13 @@ camera-lens-database = "camera_lens_database.__main__:app"
 [tool.poetry.dependencies]
 python = "^3.7.9"
 beautifulsoup4 = "^4.9.3"
+click = "^7.1.2"
 colorama = "^0.4.4"
 lxml = "^4.6.3"
 pandas = "^1.2.4"
 pydantic = "^1.8.1"
 requests = "^2.25.1"
 tqdm = "^4.60.0"
-typer = "^0.3.2"
 
 [tool.poetry.dev-dependencies]
 flake8-black = "^0.2.1"

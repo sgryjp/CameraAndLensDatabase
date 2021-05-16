@@ -4,8 +4,8 @@ from typing import Dict, Iterator, List, Optional, Tuple, Union
 from urllib.parse import urljoin, urlparse
 from uuid import uuid4
 
+import click
 import pydantic
-import typer
 from bs4 import BeautifulSoup, Tag
 from bs4.element import ResultSet
 
@@ -95,7 +95,7 @@ def enum_equipments(target: EquipmentType) -> Iterator[Tuple[str, str]]:
         if pr.hostname and pr.hostname != base_uri:
             msg = "skipped an item because it's not on the same server"
             msg += f": {anchor['href']!r} <> {base_uri!r}"
-            typer.secho(msg, fg=typer.colors.YELLOW)
+            click.secho(msg, fg="yellow")
             continue
 
         # Construct an absolute URI
