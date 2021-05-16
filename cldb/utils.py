@@ -14,7 +14,9 @@ CACHE_TIMEOUT = 8 * 3600
 
 T = TypeVar("T")
 S = TypeVar("S")
-_re_square_millimeter = re.compile(r"([\d\.]+)×([\d\.]+)mm")
+_re_square_millimeter = re.compile(
+    r"([\d\.]+)(?:\(H\))?\s*[×x]\s*([\d\.]+)(?:\(V\))?\s*mm"
+)
 
 
 def fetch(uri: str) -> str:
