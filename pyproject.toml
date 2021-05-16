@@ -1,12 +1,12 @@
 [tool.poetry]
-name = "camera_lens_database"
+name = "cldb"
 version = "21.5.5"
 description = ""
 authors = ["Suguru Yamamoto <sgryjp@gmail.com>"]
 license = "MIT"
 
 [tool.poetry.scripts]
-cldb = "camera_lens_database.cli:main"
+cldb = "cldb.cli:main"
 
 [tool.poetry.dependencies]
 python = "^3.7.9"
