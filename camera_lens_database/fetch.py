@@ -13,7 +13,7 @@ import pandas as pd
 
 from . import cameras, lenses, nikon, utils
 
-_help_max_workers = (
+_help_num_workers = (
     "Number of worker processes to launch."
     " Specifying 0 launches as many processes as CPU cores."
 )
@@ -54,7 +54,7 @@ def _read_nikon_camera(args: Tuple[str, str]) -> Optional[cameras.Camera]:
     help=_help_cameras_csv,
 )
 @click.option(
-    "-j", "--num-workers", type=int, default=0, metavar="N", help=_help_max_workers
+    "-j", "--num-workers", type=int, default=0, metavar="N", help=_help_num_workers
 )
 @click.option(
     "-o",
