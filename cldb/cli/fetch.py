@@ -84,6 +84,7 @@ def fetch(
             orig_data_path = cameras_csv
             name_uri_pairs = itertools.chain(
                 nikon.enum_equipments(nikon.EquipmentType.SLR),
+                nikon.enum_equipments(nikon.EquipmentType.SLR_OLD),
             )
             sort_keys = [
                 models.KEY_CAMERA_BRAND,

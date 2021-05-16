@@ -26,12 +26,14 @@ class EquipmentType(int, enum.Enum):
     F_LENS = enum.auto()
     Z_LENS = enum.auto()
     SLR = enum.auto()
+    SLR_OLD = enum.auto()
 
 
 MOUNT_F = "Nikon F"
 MOUNT_Z = "Nikon Z"
 
-_lenses_to_ignore = [
+_models_to_ignore = [
+    # Lenses
     "AF-S TELECONVERTER TC-14E III",
     "AF-S TELECONVERTER TC-20E III",
     "AI AF-I Teleconverter TC-14E",
@@ -45,6 +47,28 @@ _lenses_to_ignore = [
     "AI TC-301S",
     "Z TELECONVERTER TC-1.4x",
     "Z TELECONVERTER TC-2.0x",
+    # Cameras
+    "E3/E3S",
+    "F100",
+    "F5",
+    "F6",
+    "F80D/F80S",
+    "FM10",
+    "FM3A",
+    "Lite Touch Zoom 100W QD",
+    "Lite Touch Zoom 120ED QD",
+    "Lite Touch Zoom 130ED QD",
+    "Lite Touch Zoom 140ED QD",
+    "Lite Touch Zoom 150ED QD",
+    "Lite Touch Zoom 70Ws QD",
+    "NIKONOS-V",
+    "Nuvis S",
+    "Nuvis S2000",
+    "PRONEA S",
+    "S3 (限定復刻版)",
+    "U",
+    "U2",
+    "US",
 ]
 _known_lens_specs: Dict[str, Dict[str, Union[float, str]]] = {
     "AI AF Zoom-Nikkor 18-35mm f/3.5-4.5D IF-ED": {
@@ -61,6 +85,11 @@ _known_lens_specs: Dict[str, Dict[str, Union[float, str]]] = {
         models.KEY_LENS_MIN_FOCUS_DISTANCE: 410,
     },
 }
+_known_camera_specs: Dict[str, Dict[str, Union[float, str]]] = {
+    "D1": {
+        models.KEY_CAMERA_MOUNT: "Nikon F",
+    },
+}
 
 
 def enum_equipments(target: EquipmentType) -> Iterator[Tuple[str, str]]:
@@ -72,6 +101,8 @@ def enum_equipments(target: EquipmentType) -> Iterator[Tuple[str, str]]:
         base_uri = "https://www.nikon-image.com/products/nikkor/zmount/index.html"
     elif target == EquipmentType.SLR:
         base_uri = "https://www.nikon-image.com/products/slr/"
+    elif target == EquipmentType.SLR_OLD:
+        base_uri = "https://www.nikon-image.com/products/slr/discontinue_lineup/"
     else:
         msg = f"unsupported type to enumerate: {target}"
         raise ValueError(msg)
@@ -82,7 +113,7 @@ def enum_equipments(target: EquipmentType) -> Iterator[Tuple[str, str]]:
         # Get the equipment name
         name: str = anchor.select(".mod-goodsList-title")[0].text
         name = _normalize_name(name)
-        if name in _lenses_to_ignore:
+        if name in _models_to_ignore:
             continue
 
         # Get raw value of href attribute
@@ -261,9 +292,9 @@ def _normalize_name(name: str) -> str:
 
 def read_camera(name: str, uri: str) -> models.Camera:
     mode_values: List[Tuple[str, str, str, Optional[str]]] = [  # TODO: Improve name
-        # ("table.table-A01-group", "th", "td", None),
-        # ("a#spec ~ table", "td:first-child", "td:last-child", None),
         ("div#spec ~ table", "th", "td", "spec.html"),
+        ("table.table-A01-group", "th", "td", "spec.html"),
+        ("table", "td:first-child", "td:last-child", "spec.html"),
     ]
 
     errors = []
@@ -315,11 +346,26 @@ def _read_camera(
         for k, v in _recognize_camera_prop(key_cell_text, value_cell_text).items():
             pairs[k] = v
 
+    # Force using some spec data which is not available or hard to recognize
+    for k, v in _known_camera_specs.get(name, {}).items():
+        pairs[k] = v
+
+    # Infer media size name if not set
+    if models.KEY_CAMERA_SIZE_NAME not in pairs:
+        w = pairs.get(models.KEY_CAMERA_MEDIA_WIDTH)
+        h = pairs.get(models.KEY_CAMERA_MEDIA_HEIGHT)
+        if w and h:
+            assert isinstance(w, float) and isinstance(h, float)
+            size_name = models.infer_media_size_name(w, h, for_nikon=True)
+            if size_name:
+                pairs[models.KEY_CAMERA_SIZE_NAME] = size_name
+
     # Compose a spec object from the table content
     try:
         return models.Camera(**pairs)
     except pydantic.ValidationError as ex:
-        raise CameraLensDatabaseException(f"unexpected spec: {pairs}") from ex
+        msg = f"unexpected spec: {pairs}, {uri}"
+        raise CameraLensDatabaseException(msg) from ex
 
 
 def _recognize_camera_prop(key: str, value: str) -> Dict[str, Union[float, str]]:
@@ -328,7 +374,7 @@ def _recognize_camera_prop(key: str, value: str) -> Dict[str, Union[float, str]]
         if mount is not None:
             return {models.KEY_CAMERA_MOUNT: mount}
 
-    elif key == "撮像素子":
+    elif key in ("撮像素子", "撮像素子方式", "方式"):
         props: Dict[str, Union[float, str]] = {}
 
         areas = list(enum_square_millimeters(value))
@@ -336,10 +382,6 @@ def _recognize_camera_prop(key: str, value: str) -> Dict[str, Union[float, str]]
             w, h = areas[0]
             props[models.KEY_CAMERA_MEDIA_WIDTH] = w
             props[models.KEY_CAMERA_MEDIA_HEIGHT] = h
-
-        match = re.search(r"(DX|FX)\s*フォーマット", value)
-        if match:
-            props[models.KEY_CAMERA_SIZE_NAME] = match.group(1).upper()
 
         if props:
             return props

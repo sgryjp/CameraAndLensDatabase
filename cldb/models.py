@@ -2,6 +2,11 @@ from typing import Optional
 
 from pydantic import BaseModel
 
+SIZE_NAME_FX = "FX"
+SIZE_NAME_DX = "DX"
+SIZE_NAME_35MM = "35mm"
+SIZE_NAME_APS_C = "APS-C"
+
 
 class Lens(BaseModel):
     id: str
@@ -27,6 +32,16 @@ class Camera(BaseModel):
     name_japan: Optional[str]
     name_us: Optional[str]
     keywords: str
+
+
+def infer_media_size_name(
+    width: float, height: float, *, for_nikon: bool = False
+) -> Optional[str]:
+    if 35.6 <= width <= 36.0 and 23.8 <= height <= 24.0:
+        return SIZE_NAME_FX if for_nikon else SIZE_NAME_35MM
+    elif 20.7 <= width <= 23.7 and 13.8 <= height <= 15.8:
+        return SIZE_NAME_DX if for_nikon else SIZE_NAME_APS_C
+    return None
 
 
 (
