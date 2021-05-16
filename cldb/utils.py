@@ -14,6 +14,7 @@ CACHE_TIMEOUT = 8 * 3600
 
 T = TypeVar("T")
 S = TypeVar("S")
+_re_square_millimeter = re.compile(r"([\d\.]+)×([\d\.]+)mm")
 
 
 def fetch(uri: str) -> str:
@@ -87,9 +88,7 @@ def enum_millimeter_values(s: str) -> Iterator[float]:
 
 
 def enum_square_millimeters(s: str) -> Iterator[Tuple[float, float]]:
-    pairs = [
-        (float(n1), float(n2)) for n1, n2 in re.findall(r"([\d\.]+)×([\d\.]+)mm", s)
-    ]
+    pairs = [(float(n1), float(n2)) for n1, n2 in _re_square_millimeter.findall(s)]
     if pairs:
         for n1, n2 in pairs:
             yield n1, n2
