@@ -1,6 +1,4 @@
 """Command to control download cache."""
-import shutil
-
 import click
 
 from .. import cache_root
@@ -20,13 +18,16 @@ def info() -> None:
 
 
 @cache.command()
-def purge() -> None:
+@click.option("-v", "--verbose", type=int, count=True)
+def purge(verbose: bool) -> None:
     """Remove cache data."""
 
-    def print_error(func, path, exc_info):  # type: ignore[no-untyped-def]
-        _, ex, _ = exc_info
-        msg = f"cannot remove '{path}': {str(ex)}"
-        click.secho(msg, fg="yellow")
-
     if cache_root.exists():
-        shutil.rmtree(cache_root, onerror=print_error)
+        for path in cache_root.glob("**/*"):
+            try:
+                if verbose:
+                    click.secho(str(path.absolute()), dim=True)
+                path.unlink()
+            except OSError as ex:
+                msg = f"cannot remove '{path}': {str(ex)}"
+                click.secho(msg, fg="yellow")
