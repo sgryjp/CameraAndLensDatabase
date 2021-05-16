@@ -2,7 +2,7 @@ import pathlib
 
 import click
 
-__version__ = "21.5.5"
+__version__ = "21.5.16"
 
 APP_NAME = "cldb"
 
