@@ -9,7 +9,7 @@ import pydantic
 from bs4 import BeautifulSoup, Tag
 from bs4.element import ResultSet
 
-from . import cameras, config, lenses
+from . import config, models
 from .exceptions import CameraLensDatabaseException, ParseError
 from .utils import (
     enum_f_numbers,
@@ -48,17 +48,17 @@ _lenses_to_ignore = [
 ]
 _known_lens_specs: Dict[str, Dict[str, Union[float, str]]] = {
     "AI AF Zoom-Nikkor 18-35mm f/3.5-4.5D IF-ED": {
-        lenses.KEY_MIN_F_VALUE: 3.5,
+        models.KEY_LENS_MIN_F_VALUE: 3.5,
     },
     "AI AF Zoom Nikkor 24～50mm F3.3～4.5D": {
-        lenses.KEY_MIN_FOCUS_DISTANCE: 600,
+        models.KEY_LENS_MIN_FOCUS_DISTANCE: 600,
     },
     "AI Micro-Nikkor 55mm f/2.8S": {
-        lenses.KEY_MIN_FOCUS_DISTANCE: 250,
+        models.KEY_LENS_MIN_FOCUS_DISTANCE: 250,
     },
     "AI Micro-Nikkor 105mm f/2.8S": {
-        lenses.KEY_MIN_FOCAL_LENGTH: 105,
-        lenses.KEY_MIN_FOCUS_DISTANCE: 410,
+        models.KEY_LENS_MIN_FOCAL_LENGTH: 105,
+        models.KEY_LENS_MIN_FOCUS_DISTANCE: 410,
     },
 }
 
@@ -105,7 +105,7 @@ def enum_equipments(target: EquipmentType) -> Iterator[Tuple[str, str]]:
         yield name, abs_dest
 
 
-def read_lens(name: str, uri: str) -> lenses.Lens:
+def read_lens(name: str, uri: str) -> models.Lens:
     mode_values: List[Tuple[str, str, str, Optional[str]]] = [  # TODO: Improve name
         ("table.table-A01-group", "th", "td", None),
         ("a#spec ~ table", "td:first-child", "td:last-child", None),
@@ -129,7 +129,7 @@ def _read_lens(
     name: str,
     uri: str,
     params: Tuple[str, str, str, Optional[str]],
-) -> lenses.Lens:
+) -> models.Lens:
     table_selector, key_cell_selector, value_cell_selector, subpath = params
 
     if subpath is not None:
@@ -144,13 +144,13 @@ def _read_lens(
 
     # Set initial values
     pairs: Dict[str, Union[float, str]] = {
-        lenses.KEY_ID: str(uuid4()),
-        lenses.KEY_NAME: name,
-        lenses.KEY_BRAND: "Nikon",
-        lenses.KEY_KEYWORDS: "",
+        models.KEY_LENS_ID: str(uuid4()),
+        models.KEY_LENS_NAME: name,
+        models.KEY_LENS_BRAND: "Nikon",
+        models.KEY_LENS_KEYWORDS: "",
     }
     if "fmount/" in uri:
-        pairs[lenses.KEY_MOUNT] = MOUNT_F
+        pairs[models.KEY_LENS_MOUNT] = MOUNT_F
 
     # Collect and parse interested th-td pairs from the spec table
     spec_table: Tag = selection[0]
@@ -168,12 +168,12 @@ def _read_lens(
 
     # Try extracting some specs from the model name
     if (
-        lenses.KEY_MIN_FOCAL_LENGTH not in pairs
-        or lenses.KEY_MAX_FOCAL_LENGTH not in pairs
+        models.KEY_LENS_MIN_FOCAL_LENGTH not in pairs
+        or models.KEY_LENS_MAX_FOCAL_LENGTH not in pairs
     ):
         for k, v in _recognize_lens_property("焦点距離", name).items():
             pairs[k] = v
-    if lenses.KEY_MIN_F_VALUE not in pairs:
+    if models.KEY_LENS_MIN_F_VALUE not in pairs:
         for k, v in _recognize_lens_property("最大絞り", name).items():
             pairs[k] = v
 
@@ -182,14 +182,14 @@ def _read_lens(
         pairs[k] = v
 
     # Skip if we couldn't get sufficient data
-    lacked_keys = set(lenses.Lens.__fields__.keys()).difference(pairs.keys())
+    lacked_keys = set(models.Lens.__fields__.keys()).difference(pairs.keys())
     if lacked_keys:
         msg = f"cannot find {', '.join(lacked_keys)}"
         raise ParseError(msg)
 
     # Compose a spec object from the table content
     try:
-        return lenses.Lens(**pairs)
+        return models.Lens(**pairs)
     except pydantic.ValidationError as ex:
         raise CameraLensDatabaseException(f"unexpected spec: {pairs}") from ex
 
@@ -198,28 +198,28 @@ def _recognize_lens_property(key: str, value: str) -> Dict[str, Union[float, str
     if key == "型式":
         mount = _parse_mount_name(value)
         if mount is not None:
-            return {lenses.KEY_MOUNT: mount}
+            return {models.KEY_LENS_MOUNT: mount}
     elif key == "焦点距離":
         value = _remove_parens(value)
         ranges = list(enum_millimeter_ranges(value))
         if ranges:
             return {
-                lenses.KEY_MIN_FOCAL_LENGTH: min(n for n, _ in ranges),
-                lenses.KEY_MAX_FOCAL_LENGTH: max(n for _, n in ranges),
+                models.KEY_LENS_MIN_FOCAL_LENGTH: min(n for n, _ in ranges),
+                models.KEY_LENS_MAX_FOCAL_LENGTH: max(n for _, n in ranges),
             }
     elif key == "最短撮影距離":
         value = _remove_parens(value)
         values = list(enum_millimeter_values(value))
         if values:
-            return {lenses.KEY_MIN_FOCUS_DISTANCE: min(values)}
+            return {models.KEY_LENS_MIN_FOCUS_DISTANCE: min(values)}
     elif key == "最小絞り":
         values = list(enum_f_numbers(value))
         if values:
-            return {lenses.KEY_MAX_F_VALUE: max(values)}
+            return {models.KEY_LENS_MAX_F_VALUE: max(values)}
     elif key == "最大絞り":
         values = list(enum_f_numbers(value))
         if values:
-            return {lenses.KEY_MIN_F_VALUE: min(values)}
+            return {models.KEY_LENS_MIN_F_VALUE: min(values)}
 
     return {}
 
@@ -259,7 +259,7 @@ def _normalize_name(name: str) -> str:
     return name
 
 
-def read_camera(name: str, uri: str) -> cameras.Camera:
+def read_camera(name: str, uri: str) -> models.Camera:
     mode_values: List[Tuple[str, str, str, Optional[str]]] = [  # TODO: Improve name
         # ("table.table-A01-group", "th", "td", None),
         # ("a#spec ~ table", "td:first-child", "td:last-child", None),
@@ -281,7 +281,7 @@ def read_camera(name: str, uri: str) -> cameras.Camera:
 
 def _read_camera(
     name: str, uri: str, params: Tuple[str, str, str, Optional[str]]
-) -> cameras.Camera:
+) -> models.Camera:
     table_selector, key_cell_selector, value_cell_selector, subpath = params
 
     if subpath is not None:
@@ -296,10 +296,10 @@ def _read_camera(
 
     # Set initial values
     pairs: Dict[str, Union[float, str]] = {
-        cameras.KEY_ID: str(uuid4()),
-        cameras.KEY_NAME: name,
-        cameras.KEY_BRAND: "Nikon",
-        cameras.KEY_KEYWORDS: "",
+        models.KEY_CAMERA_ID: str(uuid4()),
+        models.KEY_CAMERA_NAME: name,
+        models.KEY_CAMERA_BRAND: "Nikon",
+        models.KEY_CAMERA_KEYWORDS: "",
     }
 
     # Collect and parse interested th-td pairs from the spec table
@@ -317,7 +317,7 @@ def _read_camera(
 
     # Compose a spec object from the table content
     try:
-        return cameras.Camera(**pairs)
+        return models.Camera(**pairs)
     except pydantic.ValidationError as ex:
         raise CameraLensDatabaseException(f"unexpected spec: {pairs}") from ex
 
@@ -326,7 +326,7 @@ def _recognize_camera_prop(key: str, value: str) -> Dict[str, Union[float, str]]
     if key == "レンズマウント":
         mount = _parse_mount_name(value)
         if mount is not None:
-            return {cameras.KEY_MOUNT: mount}
+            return {models.KEY_CAMERA_MOUNT: mount}
 
     elif key == "撮像素子":
         props: Dict[str, Union[float, str]] = {}
@@ -334,12 +334,12 @@ def _recognize_camera_prop(key: str, value: str) -> Dict[str, Union[float, str]]
         areas = list(enum_square_millimeters(value))
         if len(areas) == 1:
             w, h = areas[0]
-            props[cameras.KEY_MEDIA_WIDTH] = w
-            props[cameras.KEY_MEDIA_HEIGHT] = h
+            props[models.KEY_CAMERA_MEDIA_WIDTH] = w
+            props[models.KEY_CAMERA_MEDIA_HEIGHT] = h
 
         match = re.search(r"(DX|FX)\s*フォーマット", value)
         if match:
-            props[cameras.KEY_SIZE_NAME] = match.group(1).upper()
+            props[models.KEY_CAMERA_SIZE_NAME] = match.group(1).upper()
 
         if props:
             return props

@@ -11,7 +11,7 @@ from typing import Callable, Optional, Tuple, Union
 import click
 import pandas as pd
 
-from .. import cameras, lenses, nikon, utils
+from .. import models, nikon, utils
 from . import main
 
 _help_num_workers = (
@@ -28,11 +28,11 @@ class FetchTarget(str, Enum):
     CAMERA: str = "camera"
 
 
-def _read_nikon_lens(args: Tuple[str, str]) -> Optional[lenses.Lens]:
+def _read_nikon_lens(args: Tuple[str, str]) -> Optional[models.Lens]:
     return nikon.read_lens(*args)
 
 
-def _read_nikon_camera(args: Tuple[str, str]) -> Optional[cameras.Camera]:
+def _read_nikon_camera(args: Tuple[str, str]) -> Optional[models.Camera]:
     return nikon.read_camera(*args)
 
 
@@ -73,12 +73,12 @@ def fetch(
 
     TARGET must be either 'camera' or 'lens'.
     """
-    STR_COLUMNS = (lenses.KEY_BRAND, lenses.KEY_MOUNT, lenses.KEY_NAME)
+    STR_COLUMNS = (models.KEY_LENS_BRAND, models.KEY_LENS_MOUNT, models.KEY_LENS_NAME)
     multiprocessing.freeze_support()
 
     try:
         detail_fetcher: Callable[
-            [Tuple[str, str]], Optional[Union[lenses.Lens, cameras.Camera]]
+            [Tuple[str, str]], Optional[Union[models.Lens, models.Camera]]
         ]
         if target == FetchTarget.CAMERA:
             orig_data_path = cameras_csv
@@ -86,9 +86,9 @@ def fetch(
                 nikon.enum_equipments(nikon.EquipmentType.SLR),
             )
             sort_keys = [
-                cameras.KEY_BRAND,
-                cameras.KEY_MOUNT,
-                cameras.KEY_NAME,
+                models.KEY_CAMERA_BRAND,
+                models.KEY_CAMERA_MOUNT,
+                models.KEY_CAMERA_NAME,
             ]
             detail_fetcher = _read_nikon_camera
         elif target == FetchTarget.LENS:
@@ -99,11 +99,11 @@ def fetch(
                 nikon.enum_equipments(nikon.EquipmentType.Z_LENS),
             )
             sort_keys = [
-                lenses.KEY_BRAND,
-                lenses.KEY_MOUNT,
-                lenses.KEY_MIN_FOCAL_LENGTH,
-                lenses.KEY_MAX_FOCAL_LENGTH,
-                lenses.KEY_NAME,
+                models.KEY_LENS_BRAND,
+                models.KEY_LENS_MOUNT,
+                models.KEY_LENS_MIN_FOCAL_LENGTH,
+                models.KEY_LENS_MAX_FOCAL_LENGTH,
+                models.KEY_LENS_NAME,
             ]
             detail_fetcher = _read_nikon_lens
         else:
