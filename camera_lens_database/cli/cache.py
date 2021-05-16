@@ -3,22 +3,26 @@ import shutil
 
 import click
 
-from . import cache_root
+from .. import cache_root
+from . import main
 
 
-@click.group()
-def main() -> None:
+@main.group()
+def cache() -> None:
     """Do cache related operation."""
     pass
 
 
-@main.command()
+@cache.command()
 def info() -> None:
+    """Show information about the cache."""
     click.echo(cache_root.absolute())
 
 
-@main.command()
+@cache.command()
 def purge() -> None:
+    """Remove cache data."""
+
     def print_error(func, path, exc_info):  # type: ignore[no-untyped-def]
         _, ex, _ = exc_info
         msg = f"cannot remove '{path}': {str(ex)}"

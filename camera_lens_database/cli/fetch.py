@@ -11,7 +11,8 @@ from typing import Callable, Optional, Tuple, Union
 import click
 import pandas as pd
 
-from . import cameras, lenses, nikon, utils
+from .. import cameras, lenses, nikon, utils
+from . import main
 
 _help_num_workers = (
     "Number of worker processes to launch."
@@ -27,10 +28,6 @@ class FetchTarget(str, Enum):
     CAMERA: str = "camera"
 
 
-def init() -> None:
-    multiprocessing.freeze_support()
-
-
 def _read_nikon_lens(args: Tuple[str, str]) -> Optional[lenses.Lens]:
     return nikon.read_lens(*args)
 
@@ -39,7 +36,7 @@ def _read_nikon_camera(args: Tuple[str, str]) -> Optional[cameras.Camera]:
     return nikon.read_camera(*args)
 
 
-@click.command()
+@main.command()
 @click.argument("target", type=FetchTarget)
 @click.option(
     "--lenses-csv",
@@ -64,7 +61,7 @@ def _read_nikon_camera(args: Tuple[str, str]) -> Optional[cameras.Camera]:
     help=_help_output,
 )
 @click.pass_context
-def main(
+def fetch(
     ctx: click.Context,
     target: FetchTarget,
     lenses_csv: str,
@@ -72,8 +69,12 @@ def main(
     num_workers: int,
     output: Optional[str],
 ) -> None:
-    """Fetch the newest equipment data from the Web."""
+    """Fetch the newest equipment data from the Web.
+
+    TARGET must be either 'camera' or 'lens'.
+    """
     STR_COLUMNS = (lenses.KEY_BRAND, lenses.KEY_MOUNT, lenses.KEY_NAME)
+    multiprocessing.freeze_support()
 
     try:
         detail_fetcher: Callable[
