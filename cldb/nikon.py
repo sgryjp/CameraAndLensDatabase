@@ -4,10 +4,9 @@ from typing import Dict, Iterator, List, Optional, Tuple, Union
 from urllib.parse import urljoin, urlparse
 from uuid import uuid4
 
+import bs4
 import click
 import pydantic
-from bs4 import BeautifulSoup, Tag
-from bs4.element import ResultSet
 
 from . import SpecFetcher, config, models
 from .exceptions import CameraLensDatabaseException, ParseError
@@ -114,7 +113,7 @@ def enum_equipments(target: EquipmentType) -> Iterator[Tuple[str, str, SpecFetch
         raise ValueError(msg)
 
     html_text = fetch(base_uri)
-    soup = BeautifulSoup(html_text, features=config["bs_features"])
+    soup = bs4.BeautifulSoup(html_text, features=config["bs_features"])
     for anchor in soup.select(".mod-goodsList-ul > li > a"):
         # Get the equipment name
         name: str = anchor.select(".mod-goodsList-title")[0].text
@@ -173,7 +172,7 @@ def _read_lens(
         uri = urljoin(uri, subpath)
 
     html_text = fetch(uri)
-    soup = BeautifulSoup(html_text, config["bs_features"])
+    soup = bs4.BeautifulSoup(html_text, config["bs_features"])
     selection = soup.select(table_selector)
     if len(selection) <= 0:
         msg = "spec table not found"
@@ -190,10 +189,10 @@ def _read_lens(
         pairs[models.KEY_LENS_MOUNT] = MOUNT_F
 
     # Collect and parse interested th-td pairs from the spec table
-    spec_table: Tag = selection[0]
+    spec_table: bs4.Tag = selection[0]
     for row in spec_table.select("tr"):
-        key_cells: ResultSet = row.select(key_cell_selector)
-        value_cells: ResultSet = row.select(value_cell_selector)
+        key_cells: bs4.ResultSet = row.select(key_cell_selector)
+        value_cells: bs4.ResultSet = row.select(value_cell_selector)
         if len(key_cells) != 1 or len(value_cells) != 1:
             msg = "spec table does not have 1 by 1 cell pairs"
             raise ParseError(msg)
@@ -325,7 +324,7 @@ def _read_camera(
         uri = urljoin(uri, subpath)
 
     html_text = fetch(uri)
-    soup = BeautifulSoup(html_text, config["bs_features"])
+    soup = bs4.BeautifulSoup(html_text, config["bs_features"])
     selection = soup.select(table_selector)
     if len(selection) <= 0:
         msg = "spec table not found"
@@ -340,16 +339,16 @@ def _read_camera(
     }
 
     # Collect and parse interested th-td pairs from the spec table
-    spec_table: Tag = selection[0]
+    spec_table: bs4.Tag = selection[0]
     for row in spec_table.select("tr"):
-        key_cells: ResultSet = row.select(key_cell_selector)
-        value_cells: ResultSet = row.select(value_cell_selector)
+        key_cells: bs4.ResultSet = row.select(key_cell_selector)
+        value_cells: bs4.ResultSet = row.select(value_cell_selector)
         if len(key_cells) != 1 or len(value_cells) != 1:
             continue
 
         key_cell_text = key_cells[0].text.strip()
         value_cell_text = value_cells[0].text.strip()
-        for k, v in _recognize_camera_prop(key_cell_text, value_cell_text).items():
+        for k, v in _recognize_camera_property(key_cell_text, value_cell_text).items():
             pairs[k] = v
 
     # Force using some spec data which is not available or hard to recognize
@@ -374,7 +373,7 @@ def _read_camera(
         raise CameraLensDatabaseException(msg) from ex
 
 
-def _recognize_camera_prop(key: str, value: str) -> Dict[str, Union[float, str]]:
+def _recognize_camera_property(key: str, value: str) -> Dict[str, Union[float, str]]:
     if key == "レンズマウント":
         mount = _parse_mount_name(value)
         if mount is not None:
