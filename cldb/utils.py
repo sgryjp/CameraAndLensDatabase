@@ -1,12 +1,11 @@
-import multiprocessing
 import re
 from datetime import datetime, timedelta
 from hashlib import sha256
-from typing import Callable, Iterable, Iterator, List, Tuple, TypeVar
+from typing import Any, Iterator, Tuple, TypeVar
 
 import requests
 import tqdm.auto
-import tqdm.contrib.concurrent
+from joblib import Parallel
 
 from . import cache_root
 
@@ -17,6 +16,22 @@ S = TypeVar("S")
 _re_square_millimeter = re.compile(
     r"([\d\.]+)(?:\(H\))?\s*[×x]\s*([\d\.]+)(?:\(V\))?\s*mm"
 )
+
+
+class ProgressParallel(Parallel):  # type: ignore[misc]
+    # https://stackoverflow.com/questions/37804279/how-can-we-use-tqdm-in-a-parallel-execution-with-joblib
+    def __init__(self, total: int, *args: Any, **kwargs: Any):
+        super().__init__(*args, **kwargs)
+        self._total = total
+
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        with tqdm.auto.tqdm() as self._pbar:
+            return Parallel.__call__(self, *args, **kwargs)
+
+    def print_progress(self) -> None:
+        self._pbar.total = self._total
+        self._pbar.n = self.n_completed_tasks
+        self._pbar.refresh()
 
 
 def fetch(uri: str) -> str:
@@ -36,29 +51,6 @@ def fetch(uri: str) -> str:
     resp = requests.get(uri)
     cache_file_path.write_text(resp.text, encoding="utf-8", errors="replace")
     return resp.text
-
-
-def parallel_apply(
-    iterable: Iterable[T],
-    f: Callable[[T], S],
-    *,
-    num_workers: int,
-) -> List[S]:
-    # Resolve parallel processing parameters
-    tqdm_params = {"unit": "models", "max_workers": num_workers}
-    if num_workers <= 0:
-        tqdm_params["max_workers"] = multiprocessing.cpu_count()
-
-    # Process the iterable
-    if num_workers == 1:
-        del tqdm_params["max_workers"]
-        with tqdm.auto.tqdm(iterable, **tqdm_params) as pbar:
-            results = [f(args) for args in pbar]
-    else:
-        pbar = tqdm.contrib.concurrent.process_map(f, iterable, **tqdm_params)
-        results = [spec for spec in pbar]
-
-    return results
 
 
 def enum_millimeter_ranges(s: str) -> Iterator[Tuple[float, float]]:

@@ -6,10 +6,11 @@ import sys
 import traceback
 from enum import Enum
 from functools import partial
-from typing import Callable, Optional, Tuple, Union
+from typing import Callable, Optional, Union
 
 import click
 import pandas as pd
+from joblib.parallel import delayed
 
 from .. import models, nikon, utils
 from . import main
@@ -26,14 +27,6 @@ _help_output = "The file to store scraped spec data."
 class FetchTarget(str, Enum):
     LENS: str = "lens"
     CAMERA: str = "camera"
-
-
-def _read_nikon_lens(args: Tuple[str, str]) -> Optional[models.Lens]:
-    return nikon.read_lens(*args)
-
-
-def _read_nikon_camera(args: Tuple[str, str]) -> Optional[models.Camera]:
-    return nikon.read_camera(*args)
 
 
 @main.command()
@@ -78,7 +71,7 @@ def fetch(
 
     try:
         detail_fetcher: Callable[
-            [Tuple[str, str]], Optional[Union[models.Lens, models.Camera]]
+            [str, str], Optional[Union[models.Lens, models.Camera]]
         ]
         if target == FetchTarget.CAMERA:
             orig_data_path = cameras_csv
@@ -91,7 +84,7 @@ def fetch(
                 models.KEY_CAMERA_MOUNT,
                 models.KEY_CAMERA_NAME,
             ]
-            detail_fetcher = _read_nikon_camera
+            detail_fetcher = nikon.read_camera
         elif target == FetchTarget.LENS:
             orig_data_path = lenses_csv
             name_uri_pairs = itertools.chain(
@@ -106,7 +99,7 @@ def fetch(
                 models.KEY_LENS_MAX_FOCAL_LENGTH,
                 models.KEY_LENS_NAME,
             ]
-            detail_fetcher = _read_nikon_lens
+            detail_fetcher = nikon.read_lens
         else:
             msg = f"unexpected fetch target: {target}"
             raise ValueError(msg)
@@ -119,10 +112,11 @@ def fetch(
         ppargs = list(name_uri_pairs)
 
         # Fetch and analyze equipment specs
-        spec_or_nones = utils.parallel_apply(
-            ppargs, detail_fetcher, num_workers=num_workers
-        )
-        specs = [spec for spec in spec_or_nones if spec is not None]
+        n_jobs = num_workers if 0 < num_workers else multiprocessing.cpu_count()
+        total = len(ppargs)
+        with utils.ProgressParallel(total=total, n_jobs=n_jobs) as parallel:
+            f = delayed(detail_fetcher)
+            specs = parallel(f(name, uri) for name, uri in ppargs)
 
         # Reuse already assigned IDs
         for spec in specs:
