@@ -12,7 +12,7 @@ import click
 import pandas as pd
 from joblib.parallel import delayed
 
-from .. import models, nikon, utils
+from .. import models, nikon, sony, utils
 from . import main
 
 _help_num_workers = (
@@ -73,6 +73,7 @@ def fetch(
         if target == FetchTarget.CAMERA:
             orig_data_path = cameras_csv
             spec_source = itertools.chain(
+                sony.enum_cameras(),
                 nikon.enum_equipments(nikon.EquipmentType.SLR),
                 nikon.enum_equipments(nikon.EquipmentType.SLR_OLD),
             )
