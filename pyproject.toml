@@ -11,7 +11,7 @@ cldb = "cldb.cli:main"
 [tool.poetry.dependencies]
 python = "^3.7.9"
 beautifulsoup4 = "^4.9.3"
-click = "^7.1.2"
+click = "^8.0.1"
 colorama = "^0.4.4"
 joblib = "^1.0.1"
 lxml = "^4.6.3"
