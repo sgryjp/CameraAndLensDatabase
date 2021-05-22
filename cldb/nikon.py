@@ -9,7 +9,7 @@ import pydantic
 from bs4 import BeautifulSoup, Tag
 from bs4.element import ResultSet
 
-from . import config, models
+from . import SpecFetcher, config, models
 from .exceptions import CameraLensDatabaseException, ParseError
 from .utils import (
     enum_f_numbers,
@@ -92,17 +92,23 @@ _known_camera_specs: Dict[str, Dict[str, Union[float, str]]] = {
 }
 
 
-def enum_equipments(target: EquipmentType) -> Iterator[Tuple[str, str]]:
+def enum_equipments(target: EquipmentType) -> Iterator[Tuple[str, str, SpecFetcher]]:
+    fetcher: SpecFetcher
     if target == EquipmentType.F_LENS_OLD:
         base_uri = "https://www.nikon-image.com/products/nikkor/discontinue_fmount/"
+        fetcher = read_lens
     elif target == EquipmentType.F_LENS:
         base_uri = "https://www.nikon-image.com/products/nikkor/fmount/index.html"
+        fetcher = read_lens
     elif target == EquipmentType.Z_LENS:
         base_uri = "https://www.nikon-image.com/products/nikkor/zmount/index.html"
+        fetcher = read_lens
     elif target == EquipmentType.SLR:
         base_uri = "https://www.nikon-image.com/products/slr/"
+        fetcher = read_camera
     elif target == EquipmentType.SLR_OLD:
         base_uri = "https://www.nikon-image.com/products/slr/discontinue_lineup/"
+        fetcher = read_camera
     else:
         msg = f"unsupported type to enumerate: {target}"
         raise ValueError(msg)
@@ -133,7 +139,7 @@ def enum_equipments(target: EquipmentType) -> Iterator[Tuple[str, str]]:
         rel_dest = pr.path
         abs_dest = urljoin(base_uri, rel_dest)
 
-        yield name, abs_dest
+        yield name, abs_dest, fetcher
 
 
 def read_lens(name: str, uri: str) -> models.Lens:

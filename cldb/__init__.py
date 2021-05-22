@@ -1,5 +1,5 @@
 import pathlib
-from typing import Callable, Optional, Union
+from typing import Callable, Union
 
 import click
 
@@ -16,4 +16,4 @@ config = {
 
 from . import models  # noqa: E402
 
-SpecFetcher = Callable[[str, str], Optional[Union[models.Lens, models.Camera]]]
+SpecFetcher = Callable[[str, str], Union[models.Lens, models.Camera]]

@@ -12,7 +12,7 @@ import click
 import pandas as pd
 from joblib.parallel import delayed
 
-from .. import SpecFetcher, models, nikon, utils
+from .. import models, nikon, utils
 from . import main
 
 _help_num_workers = (
@@ -70,10 +70,9 @@ def fetch(
     multiprocessing.freeze_support()
 
     try:
-        detail_fetcher: SpecFetcher
         if target == FetchTarget.CAMERA:
             orig_data_path = cameras_csv
-            name_uri_pairs = itertools.chain(
+            spec_source = itertools.chain(
                 nikon.enum_equipments(nikon.EquipmentType.SLR),
                 nikon.enum_equipments(nikon.EquipmentType.SLR_OLD),
             )
@@ -82,10 +81,9 @@ def fetch(
                 models.KEY_CAMERA_MOUNT,
                 models.KEY_CAMERA_NAME,
             ]
-            detail_fetcher = nikon.read_camera
         elif target == FetchTarget.LENS:
             orig_data_path = lenses_csv
-            name_uri_pairs = itertools.chain(
+            spec_source = itertools.chain(
                 nikon.enum_equipments(nikon.EquipmentType.F_LENS_OLD),
                 nikon.enum_equipments(nikon.EquipmentType.F_LENS),
                 nikon.enum_equipments(nikon.EquipmentType.Z_LENS),
@@ -97,7 +95,6 @@ def fetch(
                 models.KEY_LENS_MAX_FOCAL_LENGTH,
                 models.KEY_LENS_NAME,
             ]
-            detail_fetcher = nikon.read_lens
         else:
             msg = f"unexpected fetch target: {target}"
             raise ValueError(msg)
@@ -106,15 +103,16 @@ def fetch(
         orig_data = pd.read_csv(orig_data_path).set_index("Name")["ID"]
         orig_id_map = {k.lower(): v.lower() for k, v in orig_data.to_dict().items()}
 
-        # Query equipments with location of thier spec data.
-        ppargs = list(name_uri_pairs)
+        # Collect where and how to fetch spec data for each equipment
+        name_uri_and_fetchers = list(spec_source)
 
         # Fetch and analyze equipment specs
         n_jobs = num_workers if 0 < num_workers else multiprocessing.cpu_count()
-        total = len(ppargs)
+        total = len(name_uri_and_fetchers)
         with utils.ProgressParallel(total=total, n_jobs=n_jobs) as parallel:
-            f = delayed(detail_fetcher)
-            specs = parallel(f(name, uri) for name, uri in ppargs)
+            specs = parallel(
+                delayed(f)(name, uri) for name, uri, f in name_uri_and_fetchers
+            )
 
         # Reuse already assigned IDs
         for spec in specs:
