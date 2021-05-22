@@ -2,6 +2,7 @@ import click
 
 
 @click.group()
+@click.version_option()
 def main() -> None:
     """Scrape camera and lens data on the web."""
     pass
