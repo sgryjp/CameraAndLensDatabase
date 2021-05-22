@@ -6,13 +6,13 @@ import sys
 import traceback
 from enum import Enum
 from functools import partial
-from typing import Callable, Optional, Union
+from typing import Optional
 
 import click
 import pandas as pd
 from joblib.parallel import delayed
 
-from .. import models, nikon, utils
+from .. import SpecFetcher, models, nikon, utils
 from . import main
 
 _help_num_workers = (
@@ -70,9 +70,7 @@ def fetch(
     multiprocessing.freeze_support()
 
     try:
-        detail_fetcher: Callable[
-            [str, str], Optional[Union[models.Lens, models.Camera]]
-        ]
+        detail_fetcher: SpecFetcher
         if target == FetchTarget.CAMERA:
             orig_data_path = cameras_csv
             name_uri_pairs = itertools.chain(

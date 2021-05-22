@@ -1,4 +1,5 @@
 import pathlib
+from typing import Callable, Optional, Union
 
 import click
 
@@ -12,3 +13,7 @@ cache_root = app_dir / "cache"
 config = {
     "bs_features": "lxml",
 }
+
+from . import models  # noqa: E402
+
+SpecFetcher = Callable[[str, str], Optional[Union[models.Lens, models.Camera]]]

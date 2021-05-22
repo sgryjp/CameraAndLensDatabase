@@ -1,7 +1,7 @@
 import re
 from datetime import datetime, timedelta
 from hashlib import sha256
-from typing import Any, Iterator, Tuple, TypeVar
+from typing import Any, Iterator, Tuple
 
 import requests
 import tqdm.auto
@@ -11,8 +11,6 @@ from . import cache_root
 
 CACHE_TIMEOUT = 8 * 3600
 
-T = TypeVar("T")
-S = TypeVar("S")
 _re_square_millimeter = re.compile(
     r"([\d\.]+)(?:\(H\))?\s*[×x]\s*([\d\.]+)(?:\(V\))?\s*mm"
 )
