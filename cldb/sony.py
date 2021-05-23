@@ -1,3 +1,4 @@
+import enum
 from typing import Dict, Iterator, Tuple, Union
 from urllib.parse import urljoin
 from uuid import uuid4
@@ -8,8 +9,10 @@ import pydantic
 from . import SpecFetcher, config, models, utils
 from .exceptions import CameraLensDatabaseException, ParseError
 
-MOUNT_A = "Sony A"
-MOUNT_E = "Sony E"
+
+class Mount(str, enum.Enum):
+    MOUNT_A = "Sony A"
+    MOUNT_E = "Sony E"
 
 _known_camera_specs: Dict[str, Dict[str, Union[float, str]]] = {}
 
@@ -84,13 +87,13 @@ def _recognize_camera_property(key: str, value: str) -> Dict[str, Union[float, s
     if key == "レンズマウント":
         value = value.replace(" ", "")
         if "Eマウント" in value:
-            return {models.KEY_CAMERA_MOUNT: MOUNT_E}
+            return {models.KEY_CAMERA_MOUNT: Mount.MOUNT_E}
 
     elif key == "使用レンズ":
         if "ソニーEマウント" in value:
-            return {models.KEY_CAMERA_MOUNT: MOUNT_E}
+            return {models.KEY_CAMERA_MOUNT: Mount.MOUNT_E}
         elif "ソニーAマウント" in value:
-            return {models.KEY_CAMERA_MOUNT: MOUNT_A}
+            return {models.KEY_CAMERA_MOUNT: Mount.MOUNT_A}
 
     elif key == "撮像素子":
         props: Dict[str, Union[float, str]] = {}

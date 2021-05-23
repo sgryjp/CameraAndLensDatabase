@@ -21,8 +21,10 @@ class EquipmentType(int, enum.Enum):
     SLR_OLD = enum.auto()
 
 
-MOUNT_F = "Nikon F"
-MOUNT_Z = "Nikon Z"
+class Mount(str, enum.Enum):
+    MOUNT_F = "Nikon F"
+    MOUNT_Z = "Nikon Z"
+
 
 _models_to_ignore = [
     # Lenses
@@ -179,7 +181,7 @@ def _read_lens(
         models.KEY_LENS_KEYWORDS: "",
     }
     if "fmount/" in uri:
-        pairs[models.KEY_LENS_MOUNT] = MOUNT_F
+        pairs[models.KEY_LENS_MOUNT] = Mount.MOUNT_F
 
     # Collect and parse interested th-td pairs from the spec table
     spec_table: bs4.Tag = selection[0]
@@ -225,7 +227,7 @@ def _read_lens(
 
 def _recognize_lens_property(key: str, value: str) -> Dict[str, Union[float, str]]:
     if key == "型式":
-        mount = _parse_mount_name(value)
+        mount = _parse_mount(value)
         if mount is not None:
             return {models.KEY_LENS_MOUNT: mount}
     elif key == "焦点距離":
@@ -253,12 +255,12 @@ def _recognize_lens_property(key: str, value: str) -> Dict[str, Union[float, str
     return {}
 
 
-def _parse_mount_name(s: str) -> str:
+def _parse_mount(s: str) -> Mount:
     s = s.replace(" ", "")
     if "ニコンZマウント" in s:
-        return MOUNT_Z
+        return Mount.MOUNT_Z
     elif "ニコンFマウント" in s:
-        return MOUNT_F
+        return Mount.MOUNT_F
     else:
         msg = f"unrecognizable mount description: {s}"
         raise ParseError(msg)
@@ -362,7 +364,7 @@ def _read_camera(
 
 def _recognize_camera_property(key: str, value: str) -> Dict[str, Union[float, str]]:
     if key == "レンズマウント":
-        mount = _parse_mount_name(value)
+        mount = _parse_mount(value)
         if mount is not None:
             return {models.KEY_CAMERA_MOUNT: mount}
 
