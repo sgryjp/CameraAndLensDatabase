@@ -1,6 +1,7 @@
 """Command to fetch internet resources."""
 import io
 import itertools
+import logging
 import multiprocessing
 import sys
 import traceback
@@ -16,6 +17,7 @@ from joblib.parallel import delayed
 from .. import models, nikon, sony, utils
 from . import main
 
+_logger = logging.getLogger(__name__)
 _help_num_workers = (
     "Number of worker processes to launch."
     " Specifying 0 launches as many processes as CPU cores."
@@ -54,6 +56,7 @@ class FetchTarget(str, Enum):
     default=None,
     help=_help_output,
 )
+@click.option("-v", "--verbose", count=True)
 @click.pass_context
 def fetch(
     ctx: click.Context,
@@ -61,6 +64,7 @@ def fetch(
     lenses_csv: Path,
     cameras_csv: Path,
     num_workers: int,
+    verbose: int,
     output: Optional[Path],
 ) -> None:
     """Fetch the newest equipment data from the Web.
@@ -70,7 +74,15 @@ def fetch(
     STR_COLUMNS = (models.KEY_LENS_BRAND, models.KEY_LENS_MOUNT, models.KEY_LENS_NAME)
     multiprocessing.freeze_support()
 
+    # Setup logger
+    log_level = {1: "INFO", 2: "DEBUG", 3: "DEBUG"}.get(verbose, "WARNING")
+    logging.basicConfig(level="DEBUG", format="[%(asctime)s] %(message)s")
+    for name in logging.root.manager.loggerDict:  # type: ignore[attr-defined]
+        logging.getLogger(name).setLevel("DEBUG" if verbose == 3 else "INFO")
+    logging.getLogger("cldb").setLevel(log_level)
+
     try:
+        _logger.info(f"fetching target: {target}")
         if target == FetchTarget.CAMERA:
             orig_data_path = cameras_csv
             spec_source = itertools.chain(
@@ -104,23 +116,32 @@ def fetch(
         # Before fetching the newest data, load already assigned equipment IDs
         orig_data = pd.read_csv(orig_data_path).set_index("Name")["ID"]
         orig_id_map = {k.lower(): v.lower() for k, v in orig_data.to_dict().items()}
+        _logger.info(
+            f"number of already registered models: {len(orig_id_map)}"
+            f" ({str(orig_data_path.absolute())})"
+        )
 
         # Collect where and how to fetch spec data for each equipment
         name_uri_and_fetchers = list(spec_source)
+        total = len(name_uri_and_fetchers)
+        _logger.info(f"total number of equipment to fetch: {total}")
 
         # Fetch and analyze equipment specs
         n_jobs = num_workers if 0 < num_workers else multiprocessing.cpu_count()
-        total = len(name_uri_and_fetchers)
         with utils.ProgressParallel(total=total, n_jobs=n_jobs) as parallel:
             specs = parallel(
                 delayed(f)(name, uri) for name, uri, f in name_uri_and_fetchers
             )
 
         # Reuse already assigned IDs
+        num_reused = 0
         for spec in specs:
             already_assigned_id = orig_id_map.get(spec.name.lower())
             if already_assigned_id is not None:
                 spec.id = already_assigned_id
+                num_reused += 1
+        _logger.info(f"number of known models: {num_reused}")
+        _logger.info(f"number of new models: {len(specs) - num_reused}")
 
         # Sort the result
         df = pd.DataFrame([s.dict() for s in specs]).sort_values(

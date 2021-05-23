@@ -1,17 +1,19 @@
 from __future__ import annotations
 
 import enum
+import logging
 import re
 from typing import Dict, Iterator, List, Optional, Tuple, Union
 from urllib.parse import urljoin, urlparse
 from uuid import uuid4
 
 import bs4
-import click
 import pydantic
 
 from . import SpecFetcher, config, models, utils
 from .exceptions import CameraLensDatabaseException, ParseError
+
+_logger = logging.getLogger(__name__)
 
 
 @enum.unique
@@ -139,7 +141,7 @@ def enum_equipments(target: EquipmentType) -> Iterator[Tuple[str, str, SpecFetch
         if pr.hostname and pr.hostname != base_uri:
             msg = "skipped an item because it's not on the same server"
             msg += f": {anchor['href']!r} <> {base_uri!r}"
-            click.secho(msg, fg="yellow")
+            _logger.warning(msg)
             continue
 
         # Construct an absolute URI
