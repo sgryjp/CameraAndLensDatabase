@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import enum
 import re
 from typing import Dict, Iterator, List, Optional, Tuple, Union
@@ -22,8 +24,19 @@ class EquipmentType(int, enum.Enum):
 
 
 class Mount(str, enum.Enum):
-    MOUNT_F = "Nikon F"
-    MOUNT_Z = "Nikon Z"
+    F = "Nikon F"
+    Z = "Nikon Z"
+
+    @staticmethod
+    def parse(s: str) -> Mount:
+        s = s.replace(" ", "")
+        if "ニコンZマウント" in s:
+            return Mount.Z
+        elif "ニコンFマウント" in s:
+            return Mount.F
+        else:
+            msg = f"unrecognizable mount description: {s}"
+            raise ParseError(msg)
 
 
 _models_to_ignore = [
@@ -181,7 +194,7 @@ def _read_lens(
         models.KEY_LENS_KEYWORDS: "",
     }
     if "fmount/" in uri:
-        pairs[models.KEY_LENS_MOUNT] = Mount.MOUNT_F
+        pairs[models.KEY_LENS_MOUNT] = Mount.F
 
     # Collect and parse interested th-td pairs from the spec table
     spec_table: bs4.Tag = selection[0]
@@ -227,7 +240,7 @@ def _read_lens(
 
 def _recognize_lens_property(key: str, value: str) -> Dict[str, Union[float, str]]:
     if key == "型式":
-        mount = _parse_mount(value)
+        mount = Mount.parse(value)
         if mount is not None:
             return {models.KEY_LENS_MOUNT: mount}
     elif key == "焦点距離":
@@ -253,17 +266,6 @@ def _recognize_lens_property(key: str, value: str) -> Dict[str, Union[float, str
             return {models.KEY_LENS_MIN_F_VALUE: min(values)}
 
     return {}
-
-
-def _parse_mount(s: str) -> Mount:
-    s = s.replace(" ", "")
-    if "ニコンZマウント" in s:
-        return Mount.MOUNT_Z
-    elif "ニコンFマウント" in s:
-        return Mount.MOUNT_F
-    else:
-        msg = f"unrecognizable mount description: {s}"
-        raise ParseError(msg)
 
 
 def _remove_parens(s: str) -> str:
@@ -316,7 +318,7 @@ def _read_camera(
     soup = bs4.BeautifulSoup(html_text, config["bs_features"])
     selection = soup.select(table_selector)
     if len(selection) <= 0:
-        msg = "spec table not found"
+        msg = f"spec table not found: {uri}"
         raise ParseError(msg)
 
     # Set initial values
@@ -364,7 +366,7 @@ def _read_camera(
 
 def _recognize_camera_property(key: str, value: str) -> Dict[str, Union[float, str]]:
     if key == "レンズマウント":
-        mount = _parse_mount(value)
+        mount = Mount.parse(value)
         if mount is not None:
             return {models.KEY_CAMERA_MOUNT: mount}
 

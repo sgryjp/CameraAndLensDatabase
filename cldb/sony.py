@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import enum
 from typing import Dict, Iterator, Tuple, Union
 from urllib.parse import urljoin
@@ -11,8 +13,17 @@ from .exceptions import CameraLensDatabaseException, ParseError
 
 
 class Mount(str, enum.Enum):
-    MOUNT_A = "Sony A"
-    MOUNT_E = "Sony E"
+    A = "Sony A"
+    E = "Sony E"
+
+    @staticmethod
+    def parse(s: str) -> Mount:
+        if "Eマウント" in s:
+            return Mount.E
+        else:
+            msg = f"unrecognizable mount description: {s}"
+            raise ParseError(msg)
+
 
 _known_camera_specs: Dict[str, Dict[str, Union[float, str]]] = {}
 
@@ -85,15 +96,15 @@ def fetch_camera(name: str, uri: str) -> models.Camera:
 def _recognize_camera_property(key: str, value: str) -> Dict[str, Union[float, str]]:
     # TODO: This can be merged with nikon._recognize_camera_prop... as a static dict?
     if key == "レンズマウント":
-        value = value.replace(" ", "")
-        if "Eマウント" in value:
-            return {models.KEY_CAMERA_MOUNT: Mount.MOUNT_E}
+        mount = Mount.parse(value)
+        if mount is not None:
+            return {models.KEY_CAMERA_MOUNT: mount}
 
     elif key == "使用レンズ":
         if "ソニーEマウント" in value:
-            return {models.KEY_CAMERA_MOUNT: Mount.MOUNT_E}
+            return {models.KEY_CAMERA_MOUNT: Mount.E}
         elif "ソニーAマウント" in value:
-            return {models.KEY_CAMERA_MOUNT: Mount.MOUNT_A}
+            return {models.KEY_CAMERA_MOUNT: Mount.A}
 
     elif key == "撮像素子":
         props: Dict[str, Union[float, str]] = {}
