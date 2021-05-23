@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import enum
 import logging
 import re
@@ -39,6 +40,14 @@ class Mount(str, enum.Enum):
         else:
             msg = f"unrecognizable mount description: {s}"
             raise ParseError(msg)
+
+
+@dataclasses.dataclass
+class SpecParseParams(object):
+    subpath: Optional[str]
+    table_selector: str
+    key_cell_selector: str
+    value_cell_selector: str
 
 
 _models_to_ignore = [
@@ -105,19 +114,19 @@ def enum_equipments(target: EquipmentType) -> Iterator[Tuple[str, str, SpecFetch
     fetcher: SpecFetcher
     if target == EquipmentType.F_LENS_OLD:
         base_uri = "https://www.nikon-image.com/products/nikkor/discontinue_fmount/"
-        fetcher = read_lens
+        fetcher = fetch_lens
     elif target == EquipmentType.F_LENS:
         base_uri = "https://www.nikon-image.com/products/nikkor/fmount/index.html"
-        fetcher = read_lens
+        fetcher = fetch_lens
     elif target == EquipmentType.Z_LENS:
         base_uri = "https://www.nikon-image.com/products/nikkor/zmount/index.html"
-        fetcher = read_lens
+        fetcher = fetch_lens
     elif target == EquipmentType.SLR:
         base_uri = "https://www.nikon-image.com/products/slr/"
-        fetcher = read_camera
+        fetcher = fetch_camera
     elif target == EquipmentType.SLR_OLD:
         base_uri = "https://www.nikon-image.com/products/slr/discontinue_lineup/"
-        fetcher = read_camera
+        fetcher = fetch_camera
     else:
         msg = f"unsupported type to enumerate: {target}"
         raise ValueError(msg)
@@ -151,17 +160,17 @@ def enum_equipments(target: EquipmentType) -> Iterator[Tuple[str, str, SpecFetch
         yield name, abs_dest, fetcher
 
 
-def read_lens(name: str, uri: str) -> models.Lens:
-    mode_values: List[Tuple[str, str, str, Optional[str]]] = [  # TODO: Improve name
-        ("table.table-A01-group", "th", "td", None),
-        ("a#spec ~ table", "td:first-child", "td:last-child", None),
-        ("div#spec ~ table", "th", "td", "spec.html"),
+def fetch_lens(name: str, uri: str) -> models.Lens:
+    parse_params: List[SpecParseParams] = [
+        SpecParseParams(None, "table.table-A01-group", "th", "td"),
+        SpecParseParams(None, "a#spec ~ table", "td:first-child", "td:last-child"),
+        SpecParseParams("spec.html", "div#spec ~ table", "th", "td"),
     ]
 
     errors = []
-    for mode, params in enumerate(mode_values):
+    for mode, params in enumerate(parse_params):
         try:
-            return _read_lens(name, uri, params)
+            return _fetch_lens(name, uri, params)
         except ParseError as ex:
             errors.append((mode, ex))
 
@@ -171,19 +180,13 @@ def read_lens(name: str, uri: str) -> models.Lens:
     raise CameraLensDatabaseException("\n".join(msglines))
 
 
-def _read_lens(
-    name: str,
-    uri: str,
-    params: Tuple[str, str, str, Optional[str]],
-) -> models.Lens:
-    table_selector, key_cell_selector, value_cell_selector, subpath = params
-
-    if subpath is not None:
-        uri = urljoin(uri, subpath)
+def _fetch_lens(name: str, uri: str, pp: SpecParseParams) -> models.Lens:
+    if pp.subpath is not None:
+        uri = urljoin(uri, pp.subpath)
 
     html_text = utils.fetch(uri)
     soup = bs4.BeautifulSoup(html_text, config["bs_features"])
-    selection = soup.select(table_selector)
+    selection = soup.select(pp.table_selector)
     if len(selection) <= 0:
         msg = "spec table not found"
         raise ParseError(msg)
@@ -201,8 +204,8 @@ def _read_lens(
     # Collect and parse interested th-td pairs from the spec table
     spec_table: bs4.Tag = selection[0]
     for row in spec_table.select("tr"):
-        key_cells: bs4.ResultSet = row.select(key_cell_selector)
-        value_cells: bs4.ResultSet = row.select(value_cell_selector)
+        key_cells: bs4.ResultSet = row.select(pp.key_cell_selector)
+        value_cells: bs4.ResultSet = row.select(pp.value_cell_selector)
         if len(key_cells) != 1 or len(value_cells) != 1:
             msg = "spec table does not have 1 by 1 cell pairs"
             raise ParseError(msg)
@@ -288,17 +291,17 @@ def _normalize_name(name: str) -> str:
     return name
 
 
-def read_camera(name: str, uri: str) -> models.Camera:
-    mode_values: List[Tuple[str, str, str, Optional[str]]] = [  # TODO: Improve name
-        ("div#spec ~ table", "th", "td", "spec.html"),
-        ("table.table-A01-group", "th", "td", "spec.html"),
-        ("table", "td:first-child", "td:last-child", "spec.html"),
+def fetch_camera(name: str, uri: str) -> models.Camera:
+    parse_params: List[SpecParseParams] = [
+        SpecParseParams("spec.html", "div#spec ~ table", "th", "td"),
+        SpecParseParams("spec.html", "table.table-A01-group", "th", "td"),
+        SpecParseParams("spec.html", "table", "td:first-child", "td:last-child"),
     ]
 
     errors = []
-    for mode, params in enumerate(mode_values):
+    for mode, params in enumerate(parse_params):
         try:
-            return _read_camera(name, uri, params)
+            return _fetch_camera(name, uri, params)
         except ParseError as ex:
             errors.append((mode, ex))
 
@@ -308,17 +311,13 @@ def read_camera(name: str, uri: str) -> models.Camera:
     raise CameraLensDatabaseException("\n".join(msglines))
 
 
-def _read_camera(
-    name: str, uri: str, params: Tuple[str, str, str, Optional[str]]
-) -> models.Camera:
-    table_selector, key_cell_selector, value_cell_selector, subpath = params
-
-    if subpath is not None:
-        uri = urljoin(uri, subpath)
+def _fetch_camera(name: str, uri: str, pp: SpecParseParams) -> models.Camera:
+    if pp.subpath is not None:
+        uri = urljoin(uri, pp.subpath)
 
     html_text = utils.fetch(uri)
     soup = bs4.BeautifulSoup(html_text, config["bs_features"])
-    selection = soup.select(table_selector)
+    selection = soup.select(pp.table_selector)
     if len(selection) <= 0:
         msg = f"spec table not found: {uri}"
         raise ParseError(msg)
@@ -334,8 +333,8 @@ def _read_camera(
     # Collect and parse interested th-td pairs from the spec table
     spec_table: bs4.Tag = selection[0]
     for row in spec_table.select("tr"):
-        key_cells: bs4.ResultSet = row.select(key_cell_selector)
-        value_cells: bs4.ResultSet = row.select(value_cell_selector)
+        key_cells: bs4.ResultSet = row.select(pp.key_cell_selector)
+        value_cells: bs4.ResultSet = row.select(pp.value_cell_selector)
         if len(key_cells) != 1 or len(value_cells) != 1:
             continue
 
