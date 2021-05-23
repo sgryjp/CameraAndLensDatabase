@@ -8,7 +8,7 @@ import traceback
 from enum import Enum
 from functools import partial
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional, Union
 
 import click
 import pandas as pd
@@ -86,7 +86,8 @@ def fetch(
         if target == FetchTarget.CAMERA:
             orig_data_path = cameras_csv
             spec_source = itertools.chain(
-                sony.enum_cameras(),
+                sony.enum_cameras(sony.EquipmentType.NEW_CAMERA),
+                sony.enum_cameras(sony.EquipmentType.OLD_CAMERA),
                 nikon.enum_equipments(nikon.EquipmentType.SLR),
                 nikon.enum_equipments(nikon.EquipmentType.SLR_OLD),
             )
@@ -129,17 +130,25 @@ def fetch(
         # Fetch and analyze equipment specs
         n_jobs = num_workers if 0 < num_workers else multiprocessing.cpu_count()
         with utils.ProgressParallel(total=total, n_jobs=n_jobs) as parallel:
-            specs = parallel(
+            specs: Union[List[models.Lens], List[models.Camera]] = parallel(
                 delayed(f)(name, uri) for name, uri, f in name_uri_and_fetchers
             )
 
-        # Reuse already assigned IDs
+        # Do some corrections such as:
+        # - reuse already assigned IDs
+        # - infer keywords from model spec
         num_reused = 0
         for spec in specs:
             already_assigned_id = orig_id_map.get(spec.name.lower())
             if already_assigned_id is not None:
                 spec.id = already_assigned_id
                 num_reused += 1
+
+            keywords = utils.infer_keywords(spec)
+            if keywords:
+                spec.keywords = ",".join(
+                    kw for kw in keywords + spec.keywords.split(", ") if kw
+                )
         _logger.info(f"number of known models: {num_reused}")
         _logger.info(f"number of new models: {len(specs) - num_reused}")
 

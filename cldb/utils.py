@@ -1,13 +1,13 @@
 import re
 from datetime import datetime, timedelta
 from hashlib import sha256
-from typing import Any, Iterator, Tuple
+from typing import Any, Iterator, List, Tuple, Union
 
 import requests
 import tqdm.auto
 from joblib import Parallel
 
-from . import cache_root
+from . import cache_root, models
 
 CACHE_TIMEOUT = 8 * 3600
 
@@ -96,6 +96,16 @@ def enum_f_numbers(s: str) -> Iterator[float]:
     if numbers:
         for number in numbers:
             yield float(number)
+
+
+def infer_keywords(model: Union[models.Lens, models.Camera]) -> List[str]:
+    keywords = []
+
+    if model.brand == "Sony" and "α" in model.name:
+        keywords.append("alpha")
+        keywords.append(model.name.replace("α", "a"))
+
+    return keywords
 
 
 def to_half_width(s: str) -> str:
