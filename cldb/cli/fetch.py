@@ -6,6 +6,7 @@ import sys
 import traceback
 from enum import Enum
 from functools import partial
+from pathlib import Path
 from typing import Optional
 
 import click
@@ -33,13 +34,13 @@ class FetchTarget(str, Enum):
 @click.argument("target", type=FetchTarget)
 @click.option(
     "--lenses-csv",
-    type=click.Path(exists=True),
+    type=click.Path(exists=True, path_type=Path),
     default="lenses.csv",
     help=_help_lenses_csv,
 )
 @click.option(
     "--cameras-csv",
-    type=click.Path(exists=True),
+    type=click.Path(exists=True, path_type=Path),
     default="cameras.csv",
     help=_help_cameras_csv,
 )
@@ -49,7 +50,7 @@ class FetchTarget(str, Enum):
 @click.option(
     "-o",
     "--output",
-    type=click.Path(dir_okay=False, writable=True),
+    type=click.Path(dir_okay=False, writable=True, path_type=Path),
     default=None,
     help=_help_output,
 )
@@ -57,10 +58,10 @@ class FetchTarget(str, Enum):
 def fetch(
     ctx: click.Context,
     target: FetchTarget,
-    lenses_csv: str,
-    cameras_csv: str,
+    lenses_csv: Path,
+    cameras_csv: Path,
     num_workers: int,
-    output: Optional[str],
+    output: Optional[Path],
 ) -> None:
     """Fetch the newest equipment data from the Web.
 
