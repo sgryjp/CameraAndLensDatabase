@@ -8,15 +8,8 @@ import bs4
 import click
 import pydantic
 
-from . import SpecFetcher, config, models
+from . import SpecFetcher, config, models, utils
 from .exceptions import CameraLensDatabaseException, ParseError
-from .utils import (
-    enum_f_numbers,
-    enum_millimeter_ranges,
-    enum_millimeter_values,
-    enum_square_millimeters,
-    fetch,
-)
 
 
 @enum.unique
@@ -112,7 +105,7 @@ def enum_equipments(target: EquipmentType) -> Iterator[Tuple[str, str, SpecFetch
         msg = f"unsupported type to enumerate: {target}"
         raise ValueError(msg)
 
-    html_text = fetch(base_uri)
+    html_text = utils.fetch(base_uri)
     soup = bs4.BeautifulSoup(html_text, features=config["bs_features"])
     for anchor in soup.select(".mod-goodsList-ul > li > a"):
         # Get the equipment name
@@ -171,7 +164,7 @@ def _read_lens(
     if subpath is not None:
         uri = urljoin(uri, subpath)
 
-    html_text = fetch(uri)
+    html_text = utils.fetch(uri)
     soup = bs4.BeautifulSoup(html_text, config["bs_features"])
     selection = soup.select(table_selector)
     if len(selection) <= 0:
@@ -237,7 +230,7 @@ def _recognize_lens_property(key: str, value: str) -> Dict[str, Union[float, str
             return {models.KEY_LENS_MOUNT: mount}
     elif key == "焦点距離":
         value = _remove_parens(value)
-        ranges = list(enum_millimeter_ranges(value))
+        ranges = list(utils.enum_millimeter_ranges(value))
         if ranges:
             return {
                 models.KEY_LENS_MIN_FOCAL_LENGTH: min(n for n, _ in ranges),
@@ -245,15 +238,15 @@ def _recognize_lens_property(key: str, value: str) -> Dict[str, Union[float, str
             }
     elif key == "最短撮影距離":
         value = _remove_parens(value)
-        values = list(enum_millimeter_values(value))
+        values = list(utils.enum_millimeter_values(value))
         if values:
             return {models.KEY_LENS_MIN_FOCUS_DISTANCE: min(values)}
     elif key == "最小絞り":
-        values = list(enum_f_numbers(value))
+        values = list(utils.enum_f_numbers(value))
         if values:
             return {models.KEY_LENS_MAX_F_VALUE: max(values)}
     elif key == "最大絞り":
-        values = list(enum_f_numbers(value))
+        values = list(utils.enum_f_numbers(value))
         if values:
             return {models.KEY_LENS_MIN_F_VALUE: min(values)}
 
@@ -271,14 +264,8 @@ def _parse_mount_name(s: str) -> str:
         raise ParseError(msg)
 
 
-def _to_half_width(s: str) -> str:
-    s = re.sub(r"（([^）]+)）", r"(\g<1>)", s)
-    s = re.sub(r"(?<=\d)～(?=[\dF])", "-", s)
-    return s
-
-
 def _remove_parens(s: str) -> str:
-    s = _to_half_width(s)
+    s = utils.to_half_width(s)
     s = re.sub(r"（[^）]+）", "", s)
     s = re.sub(r"\([^\)]+\)", "", s)
     s = re.sub(
@@ -288,7 +275,7 @@ def _remove_parens(s: str) -> str:
 
 
 def _normalize_name(name: str) -> str:
-    name = _to_half_width(name)
+    name = utils.to_half_width(name)
     name = re.sub(r"\s*(旧製品|＜NEW＞)$", "", name)
     name = re.sub(r"NIKKOR", "Nikkor", name, re.IGNORECASE)
     name = re.sub(r"(?<=[^\s])\(", " (", name)  # Insert space before an opening paren
@@ -323,7 +310,7 @@ def _read_camera(
     if subpath is not None:
         uri = urljoin(uri, subpath)
 
-    html_text = fetch(uri)
+    html_text = utils.fetch(uri)
     soup = bs4.BeautifulSoup(html_text, config["bs_features"])
     selection = soup.select(table_selector)
     if len(selection) <= 0:
@@ -382,7 +369,7 @@ def _recognize_camera_property(key: str, value: str) -> Dict[str, Union[float, s
     elif key in ("撮像素子", "撮像素子方式", "方式"):
         props: Dict[str, Union[float, str]] = {}
 
-        areas = list(enum_square_millimeters(value))
+        areas = list(utils.enum_square_millimeters(value))
         if len(areas) == 1:
             w, h = areas[0]
             props[models.KEY_CAMERA_MEDIA_WIDTH] = w

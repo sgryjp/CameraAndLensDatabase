@@ -5,9 +5,8 @@ from uuid import uuid4
 import bs4
 import pydantic
 
-from . import SpecFetcher, config, models
+from . import SpecFetcher, config, models, utils
 from .exceptions import CameraLensDatabaseException, ParseError
-from .utils import enum_square_millimeters, fetch
 
 MOUNT_A = "Sony A"
 MOUNT_E = "Sony E"
@@ -19,7 +18,7 @@ def enum_cameras() -> Iterator[Tuple[str, str, SpecFetcher]]:
     card: bs4.ResultSet
 
     base_uri = "https://www.sony.jp/ichigan/lineup/"
-    html_text = fetch(base_uri)
+    html_text = utils.fetch(base_uri)
     soup = bs4.BeautifulSoup(html_text, features=config["bs_features"])
     for card in soup.select("div[data-s5lineup-pid]"):
         name = card.select(".s5-listItem4__modelName")[0].text.strip()
@@ -30,7 +29,7 @@ def enum_cameras() -> Iterator[Tuple[str, str, SpecFetcher]]:
 def fetch_camera(name: str, uri: str) -> models.Camera:
     uri = urljoin(uri, "spec.html")
 
-    html_text = fetch(uri)
+    html_text = utils.fetch(uri)
     soup = bs4.BeautifulSoup(html_text, config["bs_features"])
     selection = soup.select(".s5-specTable > table")
     if len(selection) <= 0:
@@ -96,7 +95,7 @@ def _recognize_camera_property(key: str, value: str) -> Dict[str, Union[float, s
     elif key == "撮像素子":
         props: Dict[str, Union[float, str]] = {}
 
-        areas = list(enum_square_millimeters(value))
+        areas = list(utils.enum_square_millimeters(value))
         if len(areas) == 1:
             w, h = areas[0]
             props[models.KEY_CAMERA_MEDIA_WIDTH] = w

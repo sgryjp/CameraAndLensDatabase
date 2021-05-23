@@ -96,3 +96,9 @@ def enum_f_numbers(s: str) -> Iterator[float]:
     if numbers:
         for number in numbers:
             yield float(number)
+
+
+def to_half_width(s: str) -> str:
+    s = re.sub(r"（([^）]+)）", r"(\g<1>)", s)
+    s = re.sub(r"(?<=\d)～(?=[\dF])", "-", s)
+    return s
