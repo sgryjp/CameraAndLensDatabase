@@ -24,7 +24,15 @@ dependencies = [
 cldb = "cldb.cli:main"
 
 [project.optional-dependencies]
-dev = ["flake8-black", "flake8-isort", "mypy", "pip", "pytest-cov", "wheel"]
+dev = [
+    "flake8-black",
+    "flake8-isort",
+    "invoke",
+    "mypy",
+    "pip",
+    "pytest-cov",
+    "wheel",
+]
 
 [tool.isort]
 profile = "black"
