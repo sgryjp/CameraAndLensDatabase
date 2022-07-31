@@ -1,35 +1,30 @@
 [build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
 
-[tool.poetry]
+[project]
 name = "cldb"
 version = "21.5.16"
 description = ""
-authors = ["Suguru Yamamoto <sgryjp@gmail.com>"]
-license = "MIT"
+authors = [{ name = "Suguru Yamamoto", email = "sgryjp@gmail.com" }]
+license = { text = "MIT" }
+requires-python = ">=3.7"
+dependencies = [
+    "beautifulsoup4",
+    "click",
+    "joblib",
+    "lxml",
+    "pandas",
+    "pydantic",
+    "requests",
+    "tqdm",
+]
 
-[tool.poetry.scripts]
+[project.scripts]
 cldb = "cldb.cli:main"
 
-[tool.poetry.dependencies]
-python = "^3.7.9"
-beautifulsoup4 = "^4.9.3"
-click = "^8.0.1"
-joblib = "^1.0.1"
-lxml = "^4.6.3"
-pandas = "^1.2.4"
-pydantic = "^1.8.1"
-requests = "^2.25.1"
-tqdm = "^4.60.0"
-
-[tool.poetry.dev-dependencies]
-flake8-black = "^0.2.1"
-flake8-isort = "^4.0.0"
-mypy = "^0.812"
-pip = "^21.1.1"
-pytest-cov = "^2.12.0"
-wheel = "^0.36.2"
+[project.optional-dependencies]
+dev = ["flake8-black", "flake8-isort", "mypy", "pip", "pytest-cov", "wheel"]
 
 [tool.isort]
 multi_line_output = 3
